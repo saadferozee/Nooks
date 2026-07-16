@@ -186,7 +186,7 @@ Follow this checklist top to bottom. Check off each step before moving to the ne
 
 ## 10. Add the neomorphic base styles
 
-- [ ] Open `tailwind.config.ts` and add the Nooks brand colors under `theme.extend.colors`:
+- [x] Open `tailwind.config.ts` and add the Nooks brand colors under `theme.extend.colors`:
   ```typescript
   colors: {
     base: { light: "#E0E5EC", dark: "#2A2D3A" },
@@ -197,7 +197,7 @@ Follow this checklist top to bottom. Check off each step before moving to the ne
     ink: { light: "#3A3F4B", dark: "#E4E6EB" },
   },
   ```
-- [ ] Open `app/globals.css` and add reusable neomorphic surface classes below the `@tailwind` imports:
+- [x] Open `app/globals.css` and add reusable neomorphic surface classes below the `@tailwind` imports:
   ```css
   :root {
     --neo-base: #e0e5ec;
@@ -227,18 +227,18 @@ Follow this checklist top to bottom. Check off each step before moving to the ne
 
 ## 11. Verify everything together
 
-- [ ] Run the dev server again
+- [x] Run the dev server again
   ```bash
   npm run dev
   ```
-- [ ] Confirm no TypeScript/build errors in the terminal
-- [ ] Confirm `http://localhost:3000` still loads without errors
+- [x] Confirm no TypeScript/build errors in the terminal
+- [x] Confirm `http://localhost:3000` still loads without errors
 
 ## 12. Documentation and Git
 
-- [ ] Create a `docs/` folder in the project root and place `01-PRD.md` through `05-FTL.md` inside it
-- [ ] Confirm `.gitignore` excludes `node_modules/`, `.next/`, `.env.local`
-- [ ] Commit and push
+- [x] Create a `docs/` folder in the project root and place `01-PRD.md` through `05-FTL.md` inside it
+- [x] Confirm `.gitignore` excludes `node_modules/`, `.next/`, `.env.local`
+- [x] Commit and push
   ```bash
   git add .
   git commit -m "Phase 0: Next.js + Tailwind + Supabase setup"
