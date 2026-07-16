@@ -6,7 +6,7 @@ Broken into 6 phases with a realistic timeline for a solo developer. Each phase 
 ---
 
 ## Phase 0: Setup & Foundation (2-3 days)
-- [ ] Initialize Next.js project (App Router, TypeScript)
+- [X] Initialize Next.js project (App Router, TypeScript)
 - [ ] Configure Tailwind CSS + write neomorphic base utility classes
 - [ ] Create Supabase project (Cloud, free tier)
 - [ ] Connect Supabase JS SDK (`@supabase/supabase-js`, `@supabase/ssr`)
