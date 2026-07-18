@@ -1,6 +1,41 @@
 @import "tailwindcss";
 
 :root {
+  /* Colors */
+  --color-base-light: #e0e5ec;
+  --color-base-dark: #2a2d3a;
+
+  --color-surface-light: #f5f7fa;
+  --color-surface-dark: #343849;
+
+  --color-primary-light: #6c63ff;
+  --color-primary-dark: #8b85ff;
+
+  --color-secondary-light: #ff8b6b;
+  --color-secondary-dark: #ff9c7f;
+
+  --color-online-light: #4ade80;
+  --color-online-dark: #5ee499;
+
+  --color-ink-light: #3a3f4b;
+  --color-ink-dark: #e4e6eb;
+
+  /* Radius */
+  --radius-neo: 20px;
+
+  /* Shadows */
+  --shadow-neo-raised: 6px 6px 12px #b8bcc5, -6px -6px 12px #ffffff;
+  --shadow-neo-pressed: inset 4px 4px 8px #b8bcc5,
+    inset -4px -4px 8px #ffffff;
+
+  --shadow-neo-raised-dark: 6px 6px 12px #21232d,
+    -6px -6px 12px #333747;
+
+  --shadow-neo-pressed-dark: inset 4px 4px 8px #21232d,
+    inset -4px -4px 8px #333747;
+}
+
+:root {
   --neo-base: #e0e5ec;
   --neo-text: #3a3f4b;
 }

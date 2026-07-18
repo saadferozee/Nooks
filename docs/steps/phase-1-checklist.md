@@ -7,7 +7,7 @@ Follow this checklist top to bottom. Test each step before moving to the next.
 
 ## 1. Install form-handling dependencies
 
-- [ ] Run
+- [x] Run
   ```bash
   npm install react-hook-form zod @hookform/resolvers
   ```
@@ -15,7 +15,7 @@ Follow this checklist top to bottom. Test each step before moving to the next.
 
 ## 2. Create the `profiles` table + auto-create trigger
 
-- [ ] Go to Supabase Dashboard → SQL Editor, paste and run:
+- [x] Go to Supabase Dashboard → SQL Editor, paste and run:
   ```sql
   create table profiles (
     id uuid references auth.users(id) primary key,
@@ -54,7 +54,7 @@ Follow this checklist top to bottom. Test each step before moving to the next.
   create policy "users can update own profile"
     on profiles for update using (auth.uid() = id);
   ```
-- [ ] Confirm the table appears under Table Editor → `profiles`
+- [x] Confirm the table appears under Table Editor → `profiles`
 
 ## 3. Set up the route groups
 
