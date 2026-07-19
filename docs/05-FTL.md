@@ -6,19 +6,19 @@ Broken into 6 phases with a realistic timeline for a solo developer. Each phase 
 ---
 
 ## Phase 0: Setup & Foundation (2-3 days)
-- [X] Initialize Next.js project (App Router, TypeScript)
-- [ ] Configure Tailwind CSS + write neomorphic base utility classes
-- [ ] Create Supabase project (Cloud, free tier)
-- [ ] Connect Supabase JS SDK (`@supabase/supabase-js`, `@supabase/ssr`)
-- [ ] Set up `.env.local` (SUPABASE_URL, SUPABASE_ANON_KEY)
-- [ ] Organize folder structure (per SAD)
+- [x] Initialize Next.js project (App Router, TypeScript)
+- [x] Configure Tailwind CSS + write neomorphic base utility classes
+- [x] Create Supabase project (Cloud, free tier)
+- [x] Connect Supabase JS SDK (`@supabase/supabase-js`, `@supabase/ssr`)
+- [x] Set up `.env.local` (SUPABASE_URL, SUPABASE_ANON_KEY)
+- [x] Organize folder structure (per SAD)
 
 ## Phase 1: Authentication (3-4 days)
-- [ ] Signup/Login page UI (neomorphic form)
-- [ ] Supabase Auth integration (email/password)
-- [ ] `profiles` table + trigger (auto-create profile on signup)
+- [x] Signup/Login page UI (neomorphic form)
+- [x] Supabase Auth integration (email/password)
+- [x] `profiles` table + trigger (auto-create profile on signup)
 - [ ] Protected route middleware (via Next.js middleware.ts)
-- [ ] Logout functionality
+- [x] Logout functionality
 - [ ] **Milestone:** users can sign up/log in and land on the dashboard
 
 ## Phase 2: Core 1:1 Messaging (5-6 days)
@@ -54,7 +54,7 @@ Broken into 6 phases with a realistic timeline for a solo developer. Each phase 
 
 ## Phase 6: Polish & Deploy (3-4 days)
 - [ ] Dark mode toggle (neomorphic dark palette)
-- [ ] Profile edit page (name, avatar, bio)
+- [ ] Profile edit page (name, avatar, bio, and **username** — reuses the `useUsernameAvailability` hook from Signup for live availability check)
 - [ ] Responsive/mobile UI testing and fixes
 - [ ] Loading states, skeleton screens
 - [ ] Error boundary + reconnect UI
