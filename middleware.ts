@@ -31,9 +31,10 @@ export async function middleware(request: NextRequest) {
     const {data: {user}} = await supabase.auth.getUser();
     const path = request.nextUrl.pathname;
     const isAuthPage = path === "/login" || path === "/signup";
+    const isAuthCallback = path.startsWith("/auth/callback");
 
     // if user not login, then redirect to login page.
-    if (!user && !isAuthPage) {
+    if (!user && !isAuthPage && !isAuthCallback) {
         return NextResponse.redirect(new URL("/login", request.url));
     }
     if (user && isAuthPage) {

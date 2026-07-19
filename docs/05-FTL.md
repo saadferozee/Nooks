@@ -1,4 +1,4 @@
-# FTL — Feature Task List (Development Roadmap)
+# FTL - Feature Task List (Development Roadmap)
 ## Project: Nooks
 
 Broken into 6 phases with a realistic timeline for a solo developer. Each phase ends with a working demo — this keeps motivation intact.

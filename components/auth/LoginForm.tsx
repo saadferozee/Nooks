@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { GoogleButton } from "./GoogleButton";
 
 export function LoginForm() {
     const router = useRouter();
@@ -73,6 +74,13 @@ export function LoginForm() {
             >
                 Don&apos;t have an account? Signup
             </a>
+
+            <div className="flex items-center gap-2 text-xs text-ink-light/50 dark:text-ink-dark/50">
+                <div className="h-px flex-1 bg-ink-light/20 dark:bg-ink-dark/20" />
+                or
+                <div className="h-px flex-1 bg-ink-light/20 dark:bg-ink-dark/20" />
+            </div>
+            <GoogleButton />
         </form>
     );
 }

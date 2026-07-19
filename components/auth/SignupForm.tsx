@@ -4,6 +4,8 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { getPasswordChecks, isPasswordValid } from "@/lib/validation/password";
+import { useUsernameAvailability } from "@/lib/hooks/useUsernameAvailability";
+import { GoogleButton } from "./GoogleButton";
 
 type Step = 1 | 2 | 3;
 type UsernameStatus = "idle" | "checking" | "available" | "taken" | "invalid";
@@ -23,7 +25,8 @@ export function SignupForm() {
 
     // username setup
     const [username, setUsername] = useState("");
-    const [usernameStatus, setUsernameStatus] = useState<UsernameStatus>("idle");
+    // const [usernameStatus, setUsernameStatus] = useState<UsernameStatus>("idle");
+    const usernameStatus = useUsernameAvailability(username);
     const [submitting, setSubmitting] = useState(false);
     const [submitError, setSubmitError] = useState<string | null>(null);
 
@@ -46,31 +49,31 @@ export function SignupForm() {
     }
 
     // Debounced live username availability check
-    useEffect(() => {
-        if (username.length < 3) {
-            // eslint-disable-next-line react-hooks/set-state-in-effect
-            setUsernameStatus("idle");
-            return;
-        }
-        if (!/^[a-zA-Z0-9_]+$/.test(username)) {
-            setUsernameStatus("invalid");
-            return;
-        }
+    // useEffect(() => {
+    //     if (username.length < 3) {
+    //         // eslint-disable-next-line react-hooks/set-state-in-effect
+    //         setUsernameStatus("idle");
+    //         return;
+    //     }
+    //     if (!/^[a-zA-Z0-9_]+$/.test(username)) {
+    //         setUsernameStatus("invalid");
+    //         return;
+    //     }
 
-        setUsernameStatus("checking");
-        const timeout = setTimeout(async () => {
-            const { data } = await supabase
-                .from("profiles")
-                .select("id")
-                .eq("username", username)
-                .maybeSingle();
+    //     setUsernameStatus("checking");
+    //     const timeout = setTimeout(async () => {
+    //         const { data } = await supabase
+    //             .from("profiles")
+    //             .select("id")
+    //             .eq("username", username)
+    //             .maybeSingle();
 
-            setUsernameStatus(data ? "taken" : "available");
-        }, 500);
+    //         setUsernameStatus(data ? "taken" : "available");
+    //     }, 500);
 
-        return () => clearTimeout(timeout);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [username]);
+    //     return () => clearTimeout(timeout);
+    //     // eslint-disable-next-line react-hooks/exhaustive-deps
+    // }, [username]);
 
     async function handleFinalSubmit(e: React.FormEvent) {
         e.preventDefault();
@@ -96,7 +99,11 @@ export function SignupForm() {
         // prefix). Overwrite it with what the user actually picked.
         const { error: profileError } = await supabase
             .from("profiles")
-            .update({ username, display_name: displayName })
+            .update({
+                username,
+                display_name: displayName,
+                onboarding_complete: true,
+            })
             .eq("id", data.user.id);
 
         if (profileError) {
@@ -106,7 +113,7 @@ export function SignupForm() {
             );
             setSubmitting(false);
             setStep(2);
-            setUsernameStatus("taken");
+            // setUsernameStatus("taken");
             return;
         }
 
@@ -197,6 +204,14 @@ export function SignupForm() {
                     </a>
                 </form>
             )}
+
+            <div className="flex items-center gap-2 text-xs text-ink-light/50 dark:text-ink-dark/50">
+                <div className="h-px flex-1 bg-ink-light/20 dark:bg-ink-dark/20" />
+                or
+                <div className="h-px flex-1 bg-ink-light/20 dark:bg-ink-dark/20" />
+            </div>
+            
+            <GoogleButton />
 
             {step === 2 && (
                 <form
