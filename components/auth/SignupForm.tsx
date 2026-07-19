@@ -184,7 +184,7 @@ export function SignupForm() {
 
                     <button
                         type="submit"
-                        className="rounded-neo bg-base-light px-4 py-3 font-medium text-primary-light shadow-neo-raised transition active:shadow-neo-pressed dark:bg-base-dark dark:text-primary-dark dark:shadow-neo-raised-dark dark:active:shadow-neo-pressed-dark"
+                        className="rounded-neo bg-base-light px-4 py-3 font-medium text-ink-light shadow-neo-raised transition active:shadow-neo-pressed dark:bg-base-dark dark:text-ink-dark dark:shadow-neo-raised-dark dark:active:shadow-neo-pressed-dark"
                     >
                         Next
                     </button>

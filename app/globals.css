@@ -1,7 +1,9 @@
 @import "tailwindcss";
 
-:root {
-  /* Colors */
+/* Re-enables class-based dark mode (.dark on <html>/<body>) — v4 defaults to OS-level preference otherwise */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
   --color-base-light: #e0e5ec;
   --color-base-dark: #2a2d3a;
 
@@ -20,19 +22,12 @@
   --color-ink-light: #3a3f4b;
   --color-ink-dark: #e4e6eb;
 
-  /* Radius */
   --radius-neo: 20px;
 
-  /* Shadows */
   --shadow-neo-raised: 6px 6px 12px #b8bcc5, -6px -6px 12px #ffffff;
-  --shadow-neo-pressed: inset 4px 4px 8px #b8bcc5,
-    inset -4px -4px 8px #ffffff;
-
-  --shadow-neo-raised-dark: 6px 6px 12px #21232d,
-    -6px -6px 12px #333747;
-
-  --shadow-neo-pressed-dark: inset 4px 4px 8px #21232d,
-    inset -4px -4px 8px #333747;
+  --shadow-neo-pressed: inset 4px 4px 8px #b8bcc5, inset -4px -4px 8px #ffffff;
+  --shadow-neo-raised-dark: 6px 6px 12px #21232d, -6px -6px 12px #333747;
+  --shadow-neo-pressed-dark: inset 4px 4px 8px #21232d, inset -4px -4px 8px #333747;
 }
 
 :root {
@@ -51,23 +46,26 @@ body {
   transition: background-color 0.2s ease, color 0.2s ease;
 }
 
-/* Reusable neomorphic surface — use on cards, inputs, buttons */
+button {
+  cursor: pointer;
+}
+
 .neo-surface {
   background-color: var(--neo-base);
   border-radius: 20px;
-  box-shadow: 6px 6px 12px #b8bcc5, -6px -6px 12px #ffffff;
+  box-shadow: var(--shadow-neo-raised);
 }
 
 .dark .neo-surface {
-  box-shadow: 6px 6px 12px #21232d, -6px -6px 12px #333747;
+  box-shadow: var(--shadow-neo-raised-dark);
 }
 
 .neo-pressed {
   background-color: var(--neo-base);
   border-radius: 20px;
-  box-shadow: inset 4px 4px 8px #b8bcc5, inset -4px -4px 8px #ffffff;
+  box-shadow: var(--shadow-neo-pressed);
 }
 
 .dark .neo-pressed {
-  box-shadow: inset 4px 4px 8px #21232d, inset -4px -4px 8px #333747;
+  box-shadow: var(--shadow-neo-pressed-dark);
 }

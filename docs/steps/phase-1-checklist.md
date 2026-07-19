@@ -58,7 +58,7 @@ Follow this checklist top to bottom. Test each step before moving to the next.
 
 ## 3. Set up the route groups
 
-- [ ] Create the auth route group and pages
+- [x] Create the auth route group and pages
   ```bash
   mkdir -p "app/(auth)/login" "app/(auth)/signup"
   mkdir -p "app/(main)"
@@ -67,7 +67,7 @@ Follow this checklist top to bottom. Test each step before moving to the next.
 
 ## 4. Build the signup form
 
-- [ ] Create `app/(auth)/signup/page.tsx`:
+- [x] Create `app/(auth)/signup/page.tsx`:
   ```tsx
   "use client";
 
@@ -148,7 +148,7 @@ Follow this checklist top to bottom. Test each step before moving to the next.
 
 ## 5. Build the login form
 
-- [ ] Create `app/(auth)/login/page.tsx` — same structure as signup, but swap the Supabase call:
+- [x] Create `app/(auth)/login/page.tsx` — same structure as signup, but swap the Supabase call:
   ```tsx
   const { error } = await supabase.auth.signInWithPassword({ email, password });
   ```
@@ -156,14 +156,14 @@ Follow this checklist top to bottom. Test each step before moving to the next.
 
 ## 6. Test signup + login manually
 
-- [ ] Run `npm run dev`, go to `/signup`, create a test account
-- [ ] Check Supabase Dashboard → Authentication → Users — confirm the new user appears
-- [ ] Check Table Editor → `profiles` — confirm a row was auto-created by the trigger
-- [ ] Go to `/login`, log in with the same credentials — confirm no errors
+- [x] Run `npm run dev`, go to `/signup`, create a test account
+- [x] Check Supabase Dashboard → Authentication → Users — confirm the new user appears
+- [x] Check Table Editor → `profiles` — confirm a row was auto-created by the trigger
+- [x] Go to `/login`, log in with the same credentials — confirm no errors
 
 ## 7. Protect routes with middleware
 
-- [ ] Open `middleware.ts` and extend it to redirect based on auth state:
+- [x] Open `middleware.ts` and extend it to redirect based on auth state:
   ```typescript
   import { createServerClient } from "@supabase/ssr";
   import { NextResponse, type NextRequest } from "next/server";
@@ -215,7 +215,7 @@ Follow this checklist top to bottom. Test each step before moving to the next.
 
 ## 8. Add logout functionality
 
-- [ ] Add a logout button anywhere in `app/(main)/` (e.g. a temporary button on the homepage for now):
+- [x] Add a logout button anywhere in `app/(main)/` (e.g. a temporary button on the homepage for now):
   ```tsx
   "use client";
   import { createClient } from "@/lib/supabase/client";
@@ -238,7 +238,7 @@ Follow this checklist top to bottom. Test each step before moving to the next.
     );
   }
   ```
-- [ ] Test: click logout, confirm you're redirected to `/login` and can no longer access `/` without logging in again
+- [x] Test: click logout, confirm you're redirected to `/login` and can no longer access `/` without logging in again
 
 ## 9. (Optional, but recommended) Layer in React Hook Form + Zod validation
 

@@ -28,7 +28,17 @@ export async function middleware(request: NextRequest) {
     );
 
     // Refreshes the auth session on every request.
-    await supabase.auth.getUser();
+    const {data: {user}} = await supabase.auth.getUser();
+    const path = request.nextUrl.pathname;
+    const isAuthPage = path === "/login" || path === "/signup";
+
+    // if user not login, then redirect to login page.
+    if (!user && !isAuthPage) {
+        return NextResponse.redirect(new URL("/login", request.url));
+    }
+    if (user && isAuthPage) {
+        return NextResponse.redirect(new URL("/", request.url));
+    }
 
     return response;
 }
