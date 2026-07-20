@@ -1,0 +1,440 @@
+====================================================
+PHASE 2 - CORE 1:1 MESSAGING
+Project: Nooks
+====================================================
+
+Follow this top to bottom. Test each numbered section before
+moving to the next one. Don't skip ahead.
+
+
+----------------------------------------------------
+1. CREATE THE MESSAGING TABLES ✅
+----------------------------------------------------
+
+Go to Supabase Dashboard > SQL Editor, paste and run this
+entire block:
+
+create table conversations (
+  id uuid primary key default gen_random_uuid(),
+  type text not null check (type in ('direct', 'group')),
+  name text,
+  avatar_url text,
+  created_by uuid references profiles(id),
+  created_at timestamptz default now()
+);
+
+create table conversation_participants (
+  conversation_id uuid references conversations(id) on delete cascade,
+  user_id uuid references profiles(id) on delete cascade,
+  role text default 'member',
+  joined_at timestamptz default now(),
+  primary key (conversation_id, user_id)
+);
+
+create table messages (
+  id uuid primary key default gen_random_uuid(),
+  conversation_id uuid references conversations(id) on delete cascade,
+  sender_id uuid references profiles(id),
+  content text,
+  media_url text,
+  media_type text,
+  created_at timestamptz default now()
+);
+
+-- Row Level Security
+alter table conversations enable row level security;
+alter table conversation_participants enable row level security;
+alter table messages enable row level security;
+
+create policy "participants can view their conversations"
+  on conversation_participants for select
+  using (
+    exists (
+      select 1 from conversation_participants cp
+      where cp.conversation_id = conversation_participants.conversation_id
+      and cp.user_id = auth.uid()
+    )
+  );
+
+create policy "users can add participants to conversations they create"
+  on conversation_participants for insert
+  with check (auth.uid() is not null);
+
+create policy "participants can view messages in their conversations"
+  on messages for select
+  using (
+    exists (
+      select 1 from conversation_participants cp
+      where cp.conversation_id = messages.conversation_id
+      and cp.user_id = auth.uid()
+    )
+  );
+
+create policy "participants can send messages"
+  on messages for insert
+  with check (
+    sender_id = auth.uid() and
+    exists (
+      select 1 from conversation_participants cp
+      where cp.conversation_id = messages.conversation_id
+      and cp.user_id = auth.uid()
+    )
+  );
+
+create policy "users can view conversations they're part of"
+  on conversations for select
+  using (
+    exists (
+      select 1 from conversation_participants cp
+      where cp.conversation_id = conversations.id
+      and cp.user_id = auth.uid()
+    )
+  );
+
+create policy "authenticated users can create conversations"
+  on conversations for insert
+  with check (auth.uid() = created_by);
+
+CHECK: go to Table Editor, confirm all 3 tables exist with RLS
+enabled (you'll see a lock icon next to each table name).
+
+
+----------------------------------------------------
+2. ENABLE REALTIME ON THE MESSAGES TABLE ✅
+----------------------------------------------------
+
+By default, Supabase does not broadcast changes for a table
+until you turn it on.
+
+- Go to Database > Replication
+- Find the "messages" table
+- Toggle it ON
+
+CHECK: the toggle should show as enabled before continuing.
+Without this step, step 6 (realtime subscription) will silently
+do nothing.
+
+
+----------------------------------------------------
+3. BUILD THE USER SEARCH + "START CONVERSATION" LOGIC ✅
+----------------------------------------------------
+
+Create lib/hooks/useStartConversation.ts:
+
+"use client";
+
+import { createClient } from "@/lib/supabase/client";
+
+export function useStartConversation() {
+  const supabase = createClient();
+
+  async function startConversation(otherUserId: string, currentUserId: string) {
+    // Check if a direct conversation between these two already exists
+    const { data: existing } = await supabase
+      .from("conversation_participants")
+      .select("conversation_id, conversations!inner(type)")
+      .eq("user_id", currentUserId);
+
+    if (existing) {
+      for (const row of existing) {
+        const { data: otherParticipant } = await supabase
+          .from("conversation_participants")
+          .select("user_id")
+          .eq("conversation_id", row.conversation_id)
+          .eq("user_id", otherUserId)
+          .maybeSingle();
+
+        if (otherParticipant && (row as any).conversations.type === "direct") {
+          return row.conversation_id as string;
+        }
+      }
+    }
+
+    // No existing conversation - create one
+    const { data: newConvo, error: convoError } = await supabase
+      .from("conversations")
+      .insert({ type: "direct", created_by: currentUserId })
+      .select()
+      .single();
+
+    if (convoError || !newConvo) throw convoError;
+
+    await supabase.from("conversation_participants").insert([
+      { conversation_id: newConvo.id, user_id: currentUserId },
+      { conversation_id: newConvo.id, user_id: otherUserId },
+    ]);
+
+    return newConvo.id as string;
+  }
+
+  return { startConversation };
+}
+
+NOTE: this checks for an existing direct conversation before
+creating a new one, so two users never end up with duplicate
+1:1 threads (this was a requirement in the FSD).
+
+
+----------------------------------------------------
+4. BUILD THE CONVERSATION LIST (SIDEBAR) ✅
+----------------------------------------------------
+
+Create components/chat/ConversationList.tsx:
+
+"use client";
+
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { createClient } from "@/lib/supabase/client";
+import { useAuthStore } from "@/lib/stores/authStore";
+
+type ConversationRow = {
+  conversation_id: string;
+  conversations: {
+    id: string;
+    type: string;
+    name: string | null;
+  };
+};
+
+export function ConversationList() {
+  const supabase = createClient();
+  const user = useAuthStore((s) => s.user);
+  const [conversations, setConversations] = useState<ConversationRow[]>([]);
+
+  useEffect(() => {
+    if (!user) return;
+
+    supabase
+      .from("conversation_participants")
+      .select("conversation_id, conversations(id, type, name)")
+      .eq("user_id", user.id)
+      .then(({ data }) => {
+        if (data) setConversations(data as unknown as ConversationRow[]);
+      });
+  }, [user]);
+
+  return (
+    <div className="flex flex-col gap-2 p-4">
+      {conversations.map((c) => (
+        <Link
+          key={c.conversation_id}
+          href={`/chat/${c.conversation_id}`}
+          className="rounded-neo bg-base-light px-4 py-3 text-ink-light shadow-neo-raised dark:bg-base-dark dark:text-ink-dark dark:shadow-neo-raised-dark"
+        >
+          {c.conversations.name ?? "Direct message"}
+        </Link>
+      ))}
+    </div>
+  );
+}
+
+CHECK: for now this will show an empty list since no
+conversations exist yet - that's expected until step 5.
+
+
+----------------------------------------------------
+5. BUILD THE CHAT PAGE - STATIC FIRST (NO REALTIME YET) ✅
+----------------------------------------------------
+
+Create the dynamic route:
+  mkdir -p "app/(main)/chat/[conversationId]"
+
+Create app/(main)/chat/[conversationId]/page.tsx:
+
+import { ChatThread } from "@/components/chat/ChatThread";
+
+export default async function ChatPage({
+  params,
+}: {
+  params: Promise<{ conversationId: string }>;
+}) {
+  const { conversationId } = await params;
+  return <ChatThread conversationId={conversationId} />;
+}
+
+NOTE: params is a Promise here because this matches the newer
+Next.js convention you already ran into with cookies() in
+Phase 0 - always await it.
+
+Create components/chat/ChatThread.tsx (static version first):
+
+"use client";
+
+import { useEffect, useState } from "react";
+import { createClient } from "@/lib/supabase/client";
+import { useAuthStore } from "@/lib/stores/authStore";
+
+type Message = {
+  id: string;
+  sender_id: string;
+  content: string;
+  created_at: string;
+};
+
+export function ChatThread({ conversationId }: { conversationId: string }) {
+  const supabase = createClient();
+  const user = useAuthStore((s) => s.user);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [input, setInput] = useState("");
+
+  useEffect(() => {
+    supabase
+      .from("messages")
+      .select("id, sender_id, content, created_at")
+      .eq("conversation_id", conversationId)
+      .order("created_at", { ascending: true })
+      .then(({ data }) => {
+        if (data) setMessages(data);
+      });
+  }, [conversationId]);
+
+  async function handleSend(e: React.FormEvent) {
+    e.preventDefault();
+    if (!input.trim() || !user) return;
+
+    await supabase.from("messages").insert({
+      conversation_id: conversationId,
+      sender_id: user.id,
+      content: input,
+    });
+
+    setInput("");
+  }
+
+  return (
+    <div className="flex h-screen flex-col p-4">
+      <div className="flex-1 space-y-2 overflow-y-auto">
+        {messages.map((m) => (
+          <div
+            key={m.id}
+            className={`max-w-xs rounded-neo px-4 py-2 ${
+              m.sender_id === user?.id
+                ? "ml-auto bg-primary-light text-white dark:bg-primary-dark"
+                : "bg-surface-light text-ink-light dark:bg-surface-dark dark:text-ink-dark"
+            }`}
+          >
+            {m.content}
+          </div>
+        ))}
+      </div>
+
+      <form onSubmit={handleSend} className="flex gap-2 pt-4">
+        <input
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          placeholder="Type a message"
+          className="flex-1 rounded-neo bg-base-light px-4 py-3 text-ink-light shadow-neo-pressed outline-none dark:bg-base-dark dark:text-ink-dark dark:shadow-neo-pressed-dark"
+        />
+        <button
+          type="submit"
+          className="rounded-neo bg-base-light px-4 py-3 text-primary-light shadow-neo-raised dark:bg-base-dark dark:text-primary-dark dark:shadow-neo-raised-dark"
+        >
+          Send
+        </button>
+      </form>
+    </div>
+  );
+}
+
+CHECK: open two different browsers (or one normal + one
+incognito), log in as two different users, manually create a
+conversation row between them (or trigger it via the
+useStartConversation hook once you wire up user search), and
+send a message from one side. Refresh the OTHER browser
+manually - the message should appear. This confirms the insert
++ fetch works BEFORE we add realtime.
+
+
+----------------------------------------------------
+6. ADD SUPABASE REALTIME - INSTANT UPDATES, NO REFRESH ✅
+----------------------------------------------------
+
+Update components/chat/ChatThread.tsx - add this useEffect
+below the existing one that fetches messages:
+
+useEffect(() => {
+  const channel = supabase
+    .channel(`conversation:${conversationId}`)
+    .on(
+      "postgres_changes",
+      {
+        event: "INSERT",
+        schema: "public",
+        table: "messages",
+        filter: `conversation_id=eq.${conversationId}`,
+      },
+      (payload) => {
+        setMessages((prev) => [...prev, payload.new as Message]);
+      }
+    )
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}, [conversationId]);
+
+WHY THE FILTER MATTERS: without
+"filter: conversation_id=eq.${conversationId}", this component
+would receive EVERY new message from EVERY conversation in the
+whole database, not just this one. The filter scopes the
+subscription server-side.
+
+CHECK: with two browsers open on the SAME conversation, send a
+message from one - it should appear on the other INSTANTLY,
+with no manual refresh.
+
+
+----------------------------------------------------
+7. WIRE UP THE MAIN LAYOUT ✅
+----------------------------------------------------
+
+Create app/(main)/layout.tsx:
+
+import { ConversationList } from "@/components/chat/ConversationList";
+
+export default function MainLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex h-screen">
+      <aside className="w-72 border-r border-ink-light/10 dark:border-ink-dark/10">
+        <ConversationList />
+      </aside>
+      <main className="flex-1">{children}</main>
+    </div>
+  );
+}
+
+CHECK: navigating to "/" should now show the sidebar with your
+conversation list next to whatever the homepage renders.
+
+
+----------------------------------------------------
+8. STYLE THE MESSAGE BUBBLES PROPERLY
+----------------------------------------------------
+
+The inline conditional classes in step 5 work, but clean this
+up now that things function - pull it into its own
+MessageBubble.tsx component if the ChatThread file is getting
+long. This is optional polish, not blocking.
+
+
+====================================================
+PHASE 2 COMPLETE WHEN:
+====================================================
+- Two different logged-in users can open the same conversation
+  and see each other's messages appear instantly, no refresh ✅
+- Messages sent by "me" appear on the right (primary color),
+  messages from others appear on the left (surface color) ✅
+- Refreshing the page still shows the full message history
+  (confirms it's reading from the DB, not just local state) ✅
+- No console errors during the whole flow ✅
+
+Commit with:
+  [Added] core 1:1 realtime messaging
+
+Then move to Phase 3 - Group Chat in docs/05-FTL.md.

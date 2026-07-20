@@ -1680,7 +1680,7 @@
 			"editingShapeId": null,
 			"croppingShapeId": null,
 			"selectedShapeIds": [
-				"shape:gj-D6z1eV3XrB3WCfo606"
+				"shape:4QKjYrdl2tkujhsj9m-gy"
 			],
 			"hoveredShapeId": null,
 			"erasingShapeIds": [],
@@ -4369,9 +4369,9 @@
 			"isFocused": true,
 			"devicePixelRatio": 1.6666666269302368,
 			"isCoarsePointer": false,
-			"isHoveringCanvas": true,
+			"isHoveringCanvas": false,
 			"openMenus": [],
-			"isChangingStyle": true,
+			"isChangingStyle": false,
 			"isReadonly": false,
 			"meta": {},
 			"duplicateProps": null,

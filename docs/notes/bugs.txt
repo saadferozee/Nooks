@@ -1,0 +1,11 @@
+Finding Bugs
+
+
+
+-----------------
+[ ] No Scrolling after sending message. 
+
+details: when user send a message, it appears in bottom of screen but it can't be seen because screen stuck at same stage, when user manually scroll, then he can see.
+
+
+-----------------
