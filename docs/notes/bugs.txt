@@ -9,3 +9,21 @@ details: when user send a message, it appears in bottom of screen but it can't b
 
 
 -----------------
+[ ] No name shows in sidebar in desktop mode
+
+details: in sidebar, user can't see users name, its a static name "Direct Message"
+
+
+-----------------
+[ ] User can't see which message he in
+
+details: user have to see a border in sidebar in other users name, and it shows its selected
+
+
+-----------------
+[ ] sidebar can't toggle
+
+details: when a user in mobile device or smaller screen, they face a sidewise scroll that a UI/UX mistake
+
+
+-----------------

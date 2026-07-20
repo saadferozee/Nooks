@@ -435,6 +435,6 @@ PHASE 2 COMPLETE WHEN:
 - No console errors during the whole flow ✅
 
 Commit with:
-  [Added] core 1:1 realtime messaging
+  [Added] core 1:1 realtime messaging ✅
 
 Then move to Phase 3 - Group Chat in docs/05-FTL.md.
