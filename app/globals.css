@@ -4,68 +4,72 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
-  --color-base-light: #e0e5ec;
-  --color-base-dark: #2a2d3a;
+    --color-base-light: #e0e5ec;
+    --color-base-dark: #2a2d3a;
 
-  --color-surface-light: #f5f7fa;
-  --color-surface-dark: #343849;
+    --color-surface-light: #f5f7fa;
+    --color-surface-dark: #343849;
 
-  --color-primary-light: #6c63ff;
-  --color-primary-dark: #8b85ff;
+    --color-primary-light: #6c63ff;
+    --color-primary-dark: #8b85ff;
 
-  --color-secondary-light: #ff8b6b;
-  --color-secondary-dark: #ff9c7f;
+    --color-secondary-light: #ff8b6b;
+    --color-secondary-dark: #ff9c7f;
 
-  --color-online-light: #4ade80;
-  --color-online-dark: #5ee499;
+    --color-online-light: #4ade80;
+    --color-online-dark: #5ee499;
 
-  --color-ink-light: #3a3f4b;
-  --color-ink-dark: #e4e6eb;
+    --color-ink-light: #3a3f4b;
+    --color-ink-dark: #e4e6eb;
 
-  --radius-neo: 20px;
+    --radius-neo: 20px;
 
-  --shadow-neo-raised: 6px 6px 12px #b8bcc5, -6px -6px 12px #ffffff;
-  --shadow-neo-pressed: inset 4px 4px 8px #b8bcc5, inset -4px -4px 8px #ffffff;
-  --shadow-neo-raised-dark: 6px 6px 12px #21232d, -6px -6px 12px #333747;
-  --shadow-neo-pressed-dark: inset 4px 4px 8px #21232d, inset -4px -4px 8px #333747;
+    --shadow-neo-raised: 6px 6px 12px #b8bcc5, -6px -6px 12px #ffffff;
+    --shadow-neo-pressed:
+        inset 4px 4px 8px #b8bcc5, inset -4px -4px 8px #ffffff;
+    --shadow-neo-raised-dark: 6px 6px 12px #21232d, -6px -6px 12px #333747;
+    --shadow-neo-pressed-dark:
+        inset 4px 4px 8px #21232d, inset -4px -4px 8px #333747;
 }
 
 :root {
-  --neo-base: #e0e5ec;
-  --neo-text: #3a3f4b;
+    --neo-base: #e0e5ec;
+    --neo-text: #3a3f4b;
 }
 
 .dark {
-  --neo-base: #2a2d3a;
-  --neo-text: #e4e6eb;
+    --neo-base: #2a2d3a;
+    --neo-text: #e4e6eb;
 }
 
 body {
-  background-color: var(--neo-base);
-  color: var(--neo-text);
-  transition: background-color 0.2s ease, color 0.2s ease;
+    background-color: var(--neo-base);
+    color: var(--neo-text);
+    transition:
+        background-color 0.2s ease,
+        color 0.2s ease;
 }
 
 button {
-  cursor: pointer;
+    cursor: pointer;
 }
 
 .neo-surface {
-  background-color: var(--neo-base);
-  border-radius: 20px;
-  box-shadow: var(--shadow-neo-raised);
+    background-color: var(--neo-base);
+    border-radius: 20px;
+    box-shadow: var(--shadow-neo-raised);
 }
 
 .dark .neo-surface {
-  box-shadow: var(--shadow-neo-raised-dark);
+    box-shadow: var(--shadow-neo-raised-dark);
 }
 
 .neo-pressed {
-  background-color: var(--neo-base);
-  border-radius: 20px;
-  box-shadow: var(--shadow-neo-pressed);
+    background-color: var(--neo-base);
+    border-radius: 20px;
+    box-shadow: var(--shadow-neo-pressed);
 }
 
 .dark .neo-pressed {
-  box-shadow: var(--shadow-neo-pressed-dark);
+    box-shadow: var(--shadow-neo-pressed-dark);
 }

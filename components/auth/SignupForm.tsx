@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { getPasswordChecks, isPasswordValid } from "@/lib/validation/password";
@@ -8,7 +8,6 @@ import { useUsernameAvailability } from "@/lib/hooks/useUsernameAvailability";
 import { GoogleButton } from "./GoogleButton";
 
 type Step = 1 | 2 | 3;
-type UsernameStatus = "idle" | "checking" | "available" | "taken" | "invalid";
 
 export function SignupForm() {
     const router = useRouter();
@@ -47,33 +46,6 @@ export function SignupForm() {
         }
         setStep(2);
     }
-
-    // Debounced live username availability check
-    // useEffect(() => {
-    //     if (username.length < 3) {
-    //         // eslint-disable-next-line react-hooks/set-state-in-effect
-    //         setUsernameStatus("idle");
-    //         return;
-    //     }
-    //     if (!/^[a-zA-Z0-9_]+$/.test(username)) {
-    //         setUsernameStatus("invalid");
-    //         return;
-    //     }
-
-    //     setUsernameStatus("checking");
-    //     const timeout = setTimeout(async () => {
-    //         const { data } = await supabase
-    //             .from("profiles")
-    //             .select("id")
-    //             .eq("username", username)
-    //             .maybeSingle();
-
-    //         setUsernameStatus(data ? "taken" : "available");
-    //     }, 500);
-
-    //     return () => clearTimeout(timeout);
-    //     // eslint-disable-next-line react-hooks/exhaustive-deps
-    // }, [username]);
 
     async function handleFinalSubmit(e: React.FormEvent) {
         e.preventDefault();
@@ -210,7 +182,7 @@ export function SignupForm() {
                 or
                 <div className="h-px flex-1 bg-ink-light/20 dark:bg-ink-dark/20" />
             </div>
-            
+
             <GoogleButton />
 
             {step === 2 && (

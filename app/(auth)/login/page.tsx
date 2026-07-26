@@ -2,7 +2,7 @@ import { LoginForm } from "@/components/auth/LoginForm";
 import { Metadata } from "next";
 
 export const metadata: Metadata = {
-    title: "Login Form - Nooks"
+    title: "Login - Nooks"
 };
 
 export default function LoginPage() {

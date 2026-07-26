@@ -38,7 +38,7 @@ export function LoginForm() {
             onSubmit={handleSubmit}
             className="neo-surface flex w-full max-w-sm flex-col gap-4 p-8"
         >
-            <h1 className="text-xl font-bold ">Login </h1>
+            <h1 className="text-xl font-bold ">Login</h1>
 
             <input
                 type="email"
