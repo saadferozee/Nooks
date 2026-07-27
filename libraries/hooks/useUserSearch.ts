@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { createClient } from "@/libraries/supabase/client";
 import { useAuthStore } from "../stores/AuthStore";
 
 export type SearchResult = {

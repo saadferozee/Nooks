@@ -1,0 +1,545 @@
+====================================================
+PHASE 3 - GROUP CHAT
+Project: Nooks
+====================================================
+
+Follow this top to bottom. Test each numbered section before
+moving to the next one.
+
+Note: MessageBubble.tsx extraction (the optional cleanup from
+the end of Phase 2) is still pending - that's fine, it doesn't
+block anything here. Come back to it whenever.
+
+
+----------------------------------------------------
+1. ADD MISSING RLS POLICIES FOR GROUP MANAGEMENT
+----------------------------------------------------
+
+Phase 2 covered SELECT/INSERT on conversation_participants, but
+group chat needs one more thing: a way to REMOVE a member
+(either an admin removing someone, or a user leaving on their
+own). There's no DELETE policy yet, so this will silently fail
+right now.
+
+Same recursion trap as before applies here (a policy on
+conversation_participants that queries conversation_participants
+directly) - so we use the same security-definer-function trick
+from Phase 2.
+
+Run this in SQL Editor:
+
+create or replace function public.is_conversation_admin(_conversation_id uuid, _user_id uuid)
+returns boolean
+language sql
+security definer
+stable
+as $$
+  select exists (
+    select 1 from conversation_participants
+    where conversation_id = _conversation_id
+    and user_id = _user_id
+    and role = 'admin'
+  );
+$$;
+
+create policy "admins can remove members, users can leave"
+  on conversation_participants for delete
+  using (
+    public.is_conversation_admin(conversation_id, auth.uid())
+    or user_id = auth.uid()
+  );
+
+SECURITY NOTE (read, don't skip): the INSERT policy on
+conversation_participants from Phase 2 is intentionally loose
+("any authenticated user can insert") - fine for an MVP where
+you trust your own client code, but it technically means a
+logged-in user COULD add themselves to any conversation if they
+guessed a conversation_id. This is a known gap to tighten later
+(FTL Phase 6 polish), not something to fix right now - flagging
+it so it doesn't surprise you in a security review.
+
+CHECK: run
+  select policyname, cmd from pg_policies where tablename = 'conversation_participants';
+You should now see SELECT, INSERT, and DELETE policies listed.
+
+
+----------------------------------------------------
+2. BUILD THE GROUP CREATION HOOK
+----------------------------------------------------
+
+Create lib/hooks/useCreateGroup.ts:
+
+"use client";
+
+import { createClient } from "@/lib/supabase/client";
+
+export function useCreateGroup() {
+  const supabase = createClient();
+
+  async function createGroup(
+    groupName: string,
+    currentUserId: string,
+    memberIds: string[]
+  ) {
+    const { data: newConvo, error: convoError } = await supabase
+      .from("conversations")
+      .insert({ type: "group", name: groupName, created_by: currentUserId })
+      .select()
+      .single();
+
+    if (convoError || !newConvo) throw convoError;
+
+    const rows = [
+      { conversation_id: newConvo.id, user_id: currentUserId, role: "admin" },
+      ...memberIds.map((id) => ({
+        conversation_id: newConvo.id,
+        user_id: id,
+        role: "member",
+      })),
+    ];
+
+    const { error: participantsError } = await supabase
+      .from("conversation_participants")
+      .insert(rows);
+
+    if (participantsError) throw participantsError;
+
+    return newConvo.id as string;
+  }
+
+  return { createGroup };
+}
+
+NOTE: this chains .select().single() on the conversations
+insert (same as useStartConversation in Phase 2) - that works
+because the "users can view conversations they're part of"
+policy already has the "auth.uid() = created_by" exception we
+added when fixing the 403 bug. The participants insert does NOT
+chain .select(), so it doesn't hit that same RETURNING check.
+
+
+----------------------------------------------------
+3. BUILD THE MULTI-SELECT MEMBER PICKER + GROUP FORM
+----------------------------------------------------
+
+Create components/chat/CreateGroupForm.tsx:
+
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useUserSearch } from "@/lib/hooks/useUserSearch";
+import { useCreateGroup } from "@/lib/hooks/useCreateGroup";
+import { useAuthStore } from "@/lib/stores/authStore";
+
+type SelectedUser = { id: string; label: string };
+
+export function CreateGroupForm({ onClose }: { onClose: () => void }) {
+  const router = useRouter();
+  const currentUser = useAuthStore((s) => s.user);
+  const [groupName, setGroupName] = useState("");
+  const [query, setQuery] = useState("");
+  const [selected, setSelected] = useState<SelectedUser[]>([]);
+  const [creating, setCreating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const { results } = useUserSearch(query);
+  const { createGroup } = useCreateGroup();
+
+  function toggleUser(id: string, label: string) {
+    setSelected((prev) =>
+      prev.some((u) => u.id === id)
+        ? prev.filter((u) => u.id !== id)
+        : [...prev, { id, label }]
+    );
+  }
+
+  async function handleCreate() {
+    if (!currentUser || !groupName.trim() || selected.length === 0) {
+      setError("Add a group name and at least one member.");
+      return;
+    }
+
+    setCreating(true);
+    setError(null);
+
+    try {
+      const conversationId = await createGroup(
+        groupName,
+        currentUser.id,
+        selected.map((u) => u.id)
+      );
+      onClose();
+      router.push(`/chat/${conversationId}`);
+    } catch (err) {
+      setError("Something went wrong creating the group.");
+      setCreating(false);
+    }
+  }
+
+  return (
+    <div className="flex w-full max-w-sm flex-col gap-3 rounded-neo bg-base-light p-6 shadow-neo-raised dark:bg-base-dark dark:shadow-neo-raised-dark">
+      <h2 className="text-lg font-medium text-ink-light dark:text-ink-dark">
+        New group
+      </h2>
+
+      <input
+        type="text"
+        placeholder="Group name"
+        value={groupName}
+        onChange={(e) => setGroupName(e.target.value)}
+        className="rounded-neo bg-base-light px-4 py-2 text-sm text-ink-light shadow-neo-pressed outline-none dark:bg-base-dark dark:text-ink-dark dark:shadow-neo-pressed-dark"
+      />
+
+      {selected.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {selected.map((u) => (
+            <span
+              key={u.id}
+              onClick={() => toggleUser(u.id, u.label)}
+              className="cursor-pointer rounded-neo bg-primary-light/10 px-3 py-1 text-xs text-primary-light dark:bg-primary-dark/10 dark:text-primary-dark"
+            >
+              {u.label} x
+            </span>
+          ))}
+        </div>
+      )}
+
+      <input
+        type="text"
+        placeholder="Search people to add..."
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        className="rounded-neo bg-base-light px-4 py-2 text-sm text-ink-light shadow-neo-pressed outline-none dark:bg-base-dark dark:text-ink-dark dark:shadow-neo-pressed-dark"
+      />
+
+      {query.trim().length >= 2 && (
+        <div className="flex flex-col gap-1">
+          {results.map((r) => {
+            const label = r.display_name ?? r.username;
+            const isSelected = selected.some((u) => u.id === r.id);
+            return (
+              <button
+                key={r.id}
+                onClick={() => toggleUser(r.id, label)}
+                className={`rounded-neo px-3 py-2 text-left text-sm ${
+                  isSelected
+                    ? "bg-primary-light/10 text-primary-light dark:bg-primary-dark/10 dark:text-primary-dark"
+                    : "text-ink-light dark:text-ink-dark"
+                }`}
+              >
+                {label} <span className="text-ink-light/50 dark:text-ink-dark/50">@{r.username}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {error && (
+        <p className="text-sm text-secondary-light dark:text-secondary-dark">{error}</p>
+      )}
+
+      <div className="flex gap-2 pt-2">
+        <button
+          onClick={onClose}
+          className="flex-1 rounded-neo bg-base-light px-4 py-2 text-sm text-ink-light shadow-neo-raised dark:bg-base-dark dark:text-ink-dark dark:shadow-neo-raised-dark"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={handleCreate}
+          disabled={creating}
+          className="flex-1 rounded-neo bg-base-light px-4 py-2 text-sm font-medium text-primary-light shadow-neo-raised disabled:opacity-50 dark:bg-base-dark dark:text-primary-dark dark:shadow-neo-raised-dark"
+        >
+          {creating ? "Creating..." : "Create group"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+NOTE: clicking a selected chip removes it (toggleUser works both
+ways - it's the same function used to select AND deselect).
+
+
+----------------------------------------------------
+4. WIRE A "NEW GROUP" BUTTON INTO THE SIDEBAR
+----------------------------------------------------
+
+Update components/chat/ConversationList.tsx:
+
+Add these imports at the top:
+
+import { useState } from "react";
+import { CreateGroupForm } from "@/components/chat/CreateGroupForm";
+
+Add this state inside the component (alongside the existing
+useState calls):
+
+const [showGroupForm, setShowGroupForm] = useState(false);
+
+Add a button above (or below) <UserSearch />, and conditionally
+render the form as an overlay:
+
+<button
+  onClick={() => setShowGroupForm(true)}
+  className="rounded-neo bg-base-light px-4 py-2 text-sm text-ink-light shadow-neo-raised dark:bg-base-dark dark:text-ink-dark dark:shadow-neo-raised-dark"
+>
+  + New group
+</button>
+
+{showGroupForm && (
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
+    <CreateGroupForm onClose={() => setShowGroupForm(false)} />
+  </div>
+)}
+
+CHECK: click "+ New group", search for 2+ people, add them, name
+the group, click "Create group" - you should land on
+/chat/[newGroupId].
+
+
+----------------------------------------------------
+5. SHOW THE CONVERSATION NAME/TYPE IN THE CHAT HEADER
+----------------------------------------------------
+
+Right now ChatThread.tsx has no header at all - it doesn't even
+show WHO you're talking to. Fix that now, since it matters more
+once group chats exist (a group needs its name visible, not just
+a wall of messages).
+
+Update components/chat/ChatThread.tsx - add this near the top of
+the component, alongside the existing "messages" state:
+
+const [conversationInfo, setConversationInfo] = useState<{
+  type: string;
+  name: string | null;
+} | null>(null);
+
+Add a new useEffect (separate from the message-fetching one):
+
+useEffect(() => {
+  supabase
+    .from("conversations")
+    .select("type, name")
+    .eq("id", conversationId)
+    .single()
+    .then(({ data }) => {
+      if (data) setConversationInfo(data);
+    });
+}, [conversationId]);
+
+Add a header at the top of the returned JSX, just inside the
+outer <div className="flex h-screen flex-col p-4">:
+
+<div className="mb-2 border-b border-ink-light/10 pb-2 dark:border-ink-dark/10">
+  <h2 className="font-medium text-ink-light dark:text-ink-dark">
+    {conversationInfo?.type === "group"
+      ? conversationInfo.name
+      : "Direct message"}
+  </h2>
+</div>
+
+NOTE: for direct messages this still just says "Direct message"
+for now - showing the OTHER person's actual name requires
+joining conversation_participants + profiles and filtering out
+yourself. That's a nice-to-have polish item, not required for
+Phase 3 - the FSD lists it under general chat UI polish. Skip it
+for now unless you want to tackle it as a bonus step.
+
+
+----------------------------------------------------
+6. BUILD A GROUP INFO PANEL (VIEW + ADMIN ADD/REMOVE)
+----------------------------------------------------
+
+Create components/chat/GroupInfoPanel.tsx:
+
+"use client";
+
+import { useEffect, useState } from "react";
+import { createClient } from "@/lib/supabase/client";
+import { useAuthStore } from "@/lib/stores/authStore";
+import { useUserSearch } from "@/lib/hooks/useUserSearch";
+
+type Member = {
+  user_id: string;
+  role: string;
+  profiles: { username: string; display_name: string | null };
+};
+
+export function GroupInfoPanel({ conversationId }: { conversationId: string }) {
+  const supabase = createClient();
+  const currentUser = useAuthStore((s) => s.user);
+  const [members, setMembers] = useState<Member[]>([]);
+  const [addQuery, setAddQuery] = useState("");
+  const { results } = useUserSearch(addQuery);
+
+  const currentUserRole = members.find((m) => m.user_id === currentUser?.id)?.role;
+  const isAdmin = currentUserRole === "admin";
+
+  function loadMembers() {
+    supabase
+      .from("conversation_participants")
+      .select("user_id, role, profiles(username, display_name)")
+      .eq("conversation_id", conversationId)
+      .then(({ data }) => {
+        if (data) setMembers(data as unknown as Member[]);
+      });
+  }
+
+  useEffect(() => {
+    loadMembers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conversationId]);
+
+  async function handleRemove(userId: string) {
+    await supabase
+      .from("conversation_participants")
+      .delete()
+      .eq("conversation_id", conversationId)
+      .eq("user_id", userId);
+    loadMembers();
+  }
+
+  async function handleAdd(userId: string) {
+    await supabase.from("conversation_participants").insert({
+      conversation_id: conversationId,
+      user_id: userId,
+      role: "member",
+    });
+    setAddQuery("");
+    loadMembers();
+  }
+
+  return (
+    <div className="flex w-72 flex-col gap-3 rounded-neo bg-base-light p-4 shadow-neo-raised dark:bg-base-dark dark:shadow-neo-raised-dark">
+      <h3 className="font-medium text-ink-light dark:text-ink-dark">Members</h3>
+
+      <div className="flex flex-col gap-1">
+        {members.map((m) => (
+          <div
+            key={m.user_id}
+            className="flex items-center justify-between rounded-neo px-2 py-1 text-sm text-ink-light dark:text-ink-dark"
+          >
+            <span>
+              {m.profiles.display_name ?? m.profiles.username}
+              {m.role === "admin" && (
+                <span className="ml-1 text-xs text-primary-light dark:text-primary-dark">
+                  (admin)
+                </span>
+              )}
+            </span>
+            {isAdmin && m.user_id !== currentUser?.id && (
+              <button
+                onClick={() => handleRemove(m.user_id)}
+                className="text-xs text-secondary-light dark:text-secondary-dark"
+              >
+                Remove
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {isAdmin && (
+        <div className="flex flex-col gap-1 border-t border-ink-light/10 pt-2 dark:border-ink-dark/10">
+          <input
+            type="text"
+            placeholder="Add member..."
+            value={addQuery}
+            onChange={(e) => setAddQuery(e.target.value)}
+            className="rounded-neo bg-base-light px-3 py-2 text-sm text-ink-light shadow-neo-pressed outline-none dark:bg-base-dark dark:text-ink-dark dark:shadow-neo-pressed-dark"
+          />
+          {addQuery.trim().length >= 2 &&
+            results
+              .filter((r) => !members.some((m) => m.user_id === r.id))
+              .map((r) => (
+                <button
+                  key={r.id}
+                  onClick={() => handleAdd(r.id)}
+                  className="rounded-neo px-3 py-2 text-left text-sm text-ink-light dark:text-ink-dark"
+                >
+                  {r.display_name ?? r.username}
+                </button>
+              ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+NOTE: "isAdmin" is derived from data already fetched into
+"members" (no separate query needed) - once loadMembers() runs,
+we already know every participant's role, including the current
+user's own role in this conversation.
+
+
+----------------------------------------------------
+7. ADD A TOGGLE TO SHOW/HIDE THE INFO PANEL IN THE CHAT PAGE
+----------------------------------------------------
+
+Update components/chat/ChatThread.tsx - add state and a button
+in the header, and render the panel conditionally:
+
+Add to state:
+const [showInfo, setShowInfo] = useState(false);
+
+Update the header div from Step 5 to include a button (only
+makes sense for groups):
+
+<div className="mb-2 flex items-center justify-between border-b border-ink-light/10 pb-2 dark:border-ink-dark/10">
+  <h2 className="font-medium text-ink-light dark:text-ink-dark">
+    {conversationInfo?.type === "group" ? conversationInfo.name : "Direct message"}
+  </h2>
+  {conversationInfo?.type === "group" && (
+    <button
+      onClick={() => setShowInfo((prev) => !prev)}
+      className="text-xs text-primary-light dark:text-primary-dark"
+    >
+      Info
+    </button>
+  )}
+</div>
+
+Wrap the whole return value in a flex row so the panel can sit
+beside the thread, and conditionally render it:
+
+return (
+  <div className="flex h-screen">
+    <div className="flex flex-1 flex-col p-4">
+      {/* existing header, messages, and form go here */}
+    </div>
+    {showInfo && conversationInfo?.type === "group" && (
+      <div className="p-4">
+        <GroupInfoPanel conversationId={conversationId} />
+      </div>
+    )}
+  </div>
+);
+
+Don't forget to import it:
+import { GroupInfoPanel } from "@/components/chat/GroupInfoPanel";
+
+
+====================================================
+PHASE 3 COMPLETE WHEN:
+====================================================
+- "+ New group" creates a group with 3+ people and redirects
+  into it
+- The group name shows correctly in the chat header
+- Clicking "Info" shows the member list, correctly marking the
+  creator as "(admin)"
+- As the admin, you can add a new member and remove an existing
+  one, and the list updates immediately
+- A non-admin member does NOT see the "Remove" buttons or the
+  "Add member" search box (only the admin does)
+- Messages sent in the group appear in realtime for all members
+  (this reuses the exact same Postgres Changes subscription from
+  Phase 2 - conversation_id filtering doesn't care whether the
+  conversation is direct or group)
+
+Commit with:
+  [Added] group chat: creation, admin roles, member management
+
+Then move to Phase 4 - Presence, Typing, Read Receipts in
+docs/05-FTL.md.

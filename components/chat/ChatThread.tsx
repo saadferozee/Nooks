@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { createClient } from "@/lib/supabase/client";
-import { useAuthStore } from "@/lib/stores/AuthStore";
+import { createClient } from "@/libraries/supabase/client";
+import { useAuthStore } from "@/libraries/stores/AuthStore";
 
 type Message = {
     id: string;

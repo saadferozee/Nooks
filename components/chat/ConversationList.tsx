@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/client";
 import { UserSearch } from "@/components/chat/UserSearch";
-import { useAuthStore } from "@/lib/stores/AuthStore";
+import { createClient } from "@/libraries/supabase/client";
+import { useAuthStore } from "@/libraries/stores/AuthStore";
 
 type ConversationRow = {
     conversation_id: string;

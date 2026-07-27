@@ -2,9 +2,9 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useUserSearch } from "@/lib/hooks/useUserSearch";
-import { useStartConversation } from "@/lib/hooks/useStartConversation";
-import { useAuthStore } from "@/lib/stores/AuthStore";
+import { useUserSearch } from "@/libraries/hooks/useUserSearch";
+import { useStartConversation } from "@/libraries/hooks/useStartConversation";
+import { useAuthStore } from "@/libraries/stores/AuthStore";
 
 export function UserSearch() {
     const router = useRouter();
