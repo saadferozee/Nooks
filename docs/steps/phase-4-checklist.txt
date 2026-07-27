@@ -1,0 +1,461 @@
+====================================================
+PHASE 4 - PRESENCE, TYPING, READ RECEIPTS
+Project: Nooks
+====================================================
+
+Group chat (Phase 3) is on hold for now, so this phase focuses
+on direct messages only. Everything here is written to not
+break if group chat gets built later - the read receipt and
+typing logic work the same for both, only the "online dot in
+sidebar" part is direct-message-specific for now.
+
+Follow this top to bottom. Test each numbered section before
+moving to the next.
+
+
+----------------------------------------------------
+1. CREATE THE message_status TABLE + RLS ✅
+----------------------------------------------------
+
+Run in SQL Editor:
+
+create table message_status (
+  message_id uuid references messages(id) on delete cascade,
+  user_id uuid references profiles(id) on delete cascade,
+  status text default 'delivered',
+  updated_at timestamptz default now(),
+  primary key (message_id, user_id)
+);
+
+alter table message_status enable row level security;
+
+-- Same recursion-safe pattern as before: check participation
+-- through the message's conversation, via a security definer
+-- function, so the policy doesn't have to self-reference.
+create or replace function public.is_message_participant(_message_id uuid, _user_id uuid)
+returns boolean
+language sql
+security definer
+stable
+as $$
+  select exists (
+    select 1
+    from messages m
+    join conversation_participants cp on cp.conversation_id = m.conversation_id
+    where m.id = _message_id
+    and cp.user_id = _user_id
+  );
+$$;
+
+create policy "participants can view message status"
+  on message_status for select
+  using (public.is_message_participant(message_id, auth.uid()));
+
+create policy "participants can set their own message status"
+  on message_status for insert
+  with check (
+    user_id = auth.uid()
+    and public.is_message_participant(message_id, auth.uid())
+  );
+
+create policy "participants can update their own message status"
+  on message_status for update
+  using (user_id = auth.uid());
+
+-- Enable realtime for this table too (same as messages/
+-- conversation_participants in earlier phases)
+alter publication supabase_realtime add table message_status;
+
+CHECK: run
+  select policyname, cmd from pg_policies where tablename = 'message_status';
+You should see SELECT, INSERT, and UPDATE listed.
+
+
+----------------------------------------------------
+2. CREATE A ZUSTAND STORE FOR ONLINE PRESENCE
+----------------------------------------------------
+
+Create lib/stores/presenceStore.ts:
+
+import { create } from "zustand";
+
+type PresenceState = {
+  onlineUserIds: Set<string>;
+  setOnlineUserIds: (ids: Set<string>) => void;
+};
+
+export const usePresenceStore = create<PresenceState>((set) => ({
+  onlineUserIds: new Set(),
+  setOnlineUserIds: (ids) => set({ onlineUserIds: ids }),
+}));
+
+This follows the exact same pattern as authStore.ts from Phase
+1 - a plain Zustand store, no Context needed.
+
+
+----------------------------------------------------
+3. CREATE THE PRESENCE TRACKER (MOUNTS ONCE, LIKE AuthListener)
+----------------------------------------------------
+
+Create components/chat/PresenceTracker.tsx:
+
+"use client";
+
+import { useEffect } from "react";
+import { createClient } from "@/lib/supabase/client";
+import { useAuthStore } from "@/lib/stores/authStore";
+import { usePresenceStore } from "@/lib/stores/presenceStore";
+
+export function PresenceTracker() {
+  const user = useAuthStore((s) => s.user);
+  const setOnlineUserIds = usePresenceStore((s) => s.setOnlineUserIds);
+
+  useEffect(() => {
+    if (!user) return;
+
+    const supabase = createClient();
+    const channel = supabase.channel("online-users", {
+      config: { presence: { key: user.id } },
+    });
+
+    channel
+      .on("presence", { event: "sync" }, () => {
+        const state = channel.presenceState();
+        setOnlineUserIds(new Set(Object.keys(state)));
+      })
+      .subscribe(async (status) => {
+        if (status === "SUBSCRIBED") {
+          await channel.track({ online_at: new Date().toISOString() });
+        }
+      });
+
+    return () => {
+      // Best-effort: record when we were last seen before disconnecting.
+      supabase
+        .from("profiles")
+        .update({ status: "offline", last_seen: new Date().toISOString() })
+        .eq("id", user.id)
+        .then();
+      supabase.removeChannel(channel);
+    };
+  }, [user, setOnlineUserIds]);
+
+  return null;
+}
+
+WHY "presence sync" AND NOT "join"/"leave": sync fires with the
+FULL current list of who's online every time membership changes,
+so you always have a complete accurate set. join/leave give you
+incremental deltas, which is more error-prone to keep in sync
+by hand - sync is simpler and sufficient here.
+
+Now mount it in app/layout.tsx, next to AuthListener:
+
+import { PresenceTracker } from "@/components/chat/PresenceTracker";
+
+...
+
+<AuthListener />
+<PresenceTracker />
+{children}
+
+
+----------------------------------------------------
+4. SHOW THE ONLINE DOT + "LAST SEEN" IN THE SIDEBAR
+----------------------------------------------------
+
+For a direct conversation, we need to know WHO the other person
+is (not just the conversation row) to show their online status.
+Update components/chat/ConversationList.tsx's loadConversations
+function to also resolve the other participant:
+
+Replace the ConversationRow type and loadConversations function
+with:
+
+type ConversationRow = {
+  conversation_id: string;
+  conversations: { id: string; type: string; name: string | null };
+  otherUser?: { id: string; username: string; display_name: string | null; last_seen: string | null };
+};
+
+function loadConversations() {
+  supabase
+    .from("conversation_participants")
+    .select("conversation_id, conversations(id, type, name)")
+    .eq("user_id", user!.id)
+    .then(async ({ data }) => {
+      if (!data) return;
+      const rows = data as unknown as ConversationRow[];
+
+      // For direct conversations, fetch who the OTHER person is
+      const directIds = rows
+        .filter((r) => r.conversations.type === "direct")
+        .map((r) => r.conversation_id);
+
+      if (directIds.length > 0) {
+        const { data: others } = await supabase
+          .from("conversation_participants")
+          .select("conversation_id, profiles(id, username, display_name, last_seen)")
+          .in("conversation_id", directIds)
+          .neq("user_id", user!.id);
+
+        const otherMap = new Map(
+          (others ?? []).map((o: any) => [o.conversation_id, o.profiles])
+        );
+
+        rows.forEach((r) => {
+          r.otherUser = otherMap.get(r.conversation_id);
+        });
+      }
+
+      setConversations(rows);
+    });
+}
+
+Now update the JSX that renders each conversation link to show
+the online dot and a name (finally resolving the "Direct
+message" placeholder from Phase 2/3):
+
+import { usePresenceStore } from "@/lib/stores/presenceStore";
+
+// inside the component:
+const onlineUserIds = usePresenceStore((s) => s.onlineUserIds);
+
+// inside the .map():
+{conversations.map((c) => {
+  const isOnline = c.otherUser && onlineUserIds.has(c.otherUser.id);
+  const label =
+    c.conversations.type === "group"
+      ? c.conversations.name
+      : c.otherUser?.display_name ?? c.otherUser?.username ?? "Direct message";
+
+  return (
+    <Link
+      key={c.conversation_id}
+      href={`/chat/${c.conversation_id}`}
+      className="flex items-center gap-2 rounded-neo bg-base-light px-4 py-3 text-ink-light shadow-neo-raised dark:bg-base-dark dark:text-ink-dark dark:shadow-neo-raised-dark"
+    >
+      {c.conversations.type === "direct" && (
+        <span
+          className={`h-2 w-2 rounded-full ${
+            isOnline
+              ? "bg-online-light dark:bg-online-dark"
+              : "bg-ink-light/30 dark:bg-ink-dark/30"
+          }`}
+        />
+      )}
+      {label}
+    </Link>
+  );
+})}
+
+CHECK: open two browsers, log in as two different users who
+already have a direct conversation. The sidebar should show the
+other person's actual name (not "Direct message" anymore), with
+a green dot if they're currently on the site, gray if not.
+
+
+----------------------------------------------------
+5. ADD THE TYPING INDICATOR (BROADCAST CHANNEL)
+----------------------------------------------------
+
+This uses Broadcast, not Postgres Changes - nothing gets written
+to the database, so it's cheap and instant.
+
+Update components/chat/ChatThread.tsx. Add this state:
+
+const [typingUser, setTypingUser] = useState<string | null>(null);
+
+Add a new useEffect for the broadcast channel:
+
+useEffect(() => {
+  const channel = supabase
+    .channel(`typing:${conversationId}`)
+    .on("broadcast", { event: "typing" }, (payload) => {
+      if (payload.payload.userId !== user?.id) {
+        setTypingUser(payload.payload.userId);
+        setTimeout(() => setTypingUser(null), 2000);
+      }
+    })
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [conversationId]);
+
+Add a debounced broadcast trigger. Update the input's onChange:
+
+let typingTimeout: NodeJS.Timeout;
+
+function handleInputChange(value: string) {
+  setInput(value);
+  const channel = supabase.channel(`typing:${conversationId}`);
+  channel.send({
+    type: "broadcast",
+    event: "typing",
+    payload: { userId: user?.id },
+  });
+}
+
+...and change the input's onChange prop to:
+  onChange={(e) => handleInputChange(e.target.value)}
+
+Add the indicator to the JSX, just above the <form>:
+
+{typingUser && (
+  <p className="px-1 text-xs text-ink-light/50 dark:text-ink-dark/50">
+    Typing...
+  </p>
+)}
+
+NOTE: creating a new channel() on every keystroke (as written
+above) works but is wasteful - a cleaner version reuses a single
+channel ref via useRef instead of calling channel() repeatedly.
+Get it working first with this simple version, then optimize if
+you want - noting it here so the inefficiency is a known
+tradeoff, not an accident.
+
+
+----------------------------------------------------
+6. ADD READ RECEIPTS - MARK MESSAGES AS DELIVERED
+----------------------------------------------------
+
+When a message arrives via the realtime subscription (from
+Phase 2), the receiving client should immediately mark it
+"delivered". Update the existing postgres_changes useEffect in
+ChatThread.tsx - inside the callback that already does
+setMessages(prev => [...prev, payload.new as Message]), add:
+
+if (payload.new.sender_id !== user?.id) {
+  supabase.from("message_status").insert({
+    message_id: payload.new.id,
+    user_id: user?.id,
+    status: "delivered",
+  }).then();
+}
+
+NOTE: only mark it delivered if YOU are not the sender - a
+sender doesn't need a delivery receipt for their own message.
+
+
+----------------------------------------------------
+7. MARK MESSAGES AS "READ" WHEN THE CHAT IS OPEN
+----------------------------------------------------
+
+Add a new useEffect in ChatThread.tsx that runs whenever the
+message list changes, marking any unread messages (not sent by
+you) as read:
+
+useEffect(() => {
+  if (!user || messages.length === 0) return;
+
+  const unreadFromOthers = messages.filter((m) => m.sender_id !== user.id);
+
+  unreadFromOthers.forEach((m) => {
+    supabase
+      .from("message_status")
+      .upsert(
+        { message_id: m.id, user_id: user.id, status: "read" },
+        { onConflict: "message_id,user_id" }
+      )
+      .then();
+  });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [messages, user]);
+
+WHY upsert INSTEAD OF insert: a status row might already exist
+from step 6 (status='delivered') - upsert updates it to 'read'
+if it exists, or creates it fresh if it doesn't. Using plain
+insert here would fail on the primary key conflict.
+
+
+----------------------------------------------------
+8. SHOW THE TICK MARKS ON YOUR OWN SENT MESSAGES
+----------------------------------------------------
+
+Update the Message type and fetch in ChatThread.tsx to also
+pull status, then render a tick based on it. Update the type:
+
+type Message = {
+  id: string;
+  sender_id: string;
+  content: string;
+  created_at: string;
+  status?: string;
+};
+
+Fetch statuses alongside messages - add this right after the
+existing message-fetching useEffect, as a follow-up query:
+
+useEffect(() => {
+  if (messages.length === 0) return;
+
+  const myMessageIds = messages
+    .filter((m) => m.sender_id === user?.id)
+    .map((m) => m.id);
+
+  if (myMessageIds.length === 0) return;
+
+  supabase
+    .from("message_status")
+    .select("message_id, status")
+    .in("message_id", myMessageIds)
+    .then(({ data }) => {
+      if (!data) return;
+      setMessages((prev) =>
+        prev.map((m) => {
+          const found = data.find((d) => d.message_id === m.id);
+          return found ? { ...m, status: found.status } : m;
+        })
+      );
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [messages.length]);
+
+Add the tick display inside the message bubble JSX, only for
+messages you sent:
+
+{m.sender_id === user?.id && (
+  <span className="ml-1 text-xs">
+    {m.status === "read" ? (
+      <span className="text-primary-light dark:text-primary-dark">✓✓</span>
+    ) : m.status === "delivered" ? (
+      <span className="text-white/70">✓✓</span>
+    ) : (
+      <span className="text-white/70">✓</span>
+    )}
+  </span>
+)}
+
+NOTE: this re-fetches statuses whenever messages.length changes,
+which is a simple but not fully realtime way to see ticks update
+(you'd need to refresh or send another message to see the other
+person's read receipt reflect). A fully realtime version would
+subscribe to message_status changes the same way we subscribed
+to messages in Phase 2 - that's a good next-level improvement
+once the basic version is confirmed working, not required to
+call Phase 4 done.
+
+
+====================================================
+PHASE 4 COMPLETE WHEN:
+====================================================
+- Sidebar shows a green dot next to people who are currently on
+  the site, gray for those who aren't
+- Opening a chat and typing shows "Typing..." on the OTHER
+  person's screen within a second or two, and it clears a couple
+  seconds after you stop
+- Sending a message shows a single tick; once the other person's
+  client marks it delivered, it becomes a double tick; once they
+  open the chat, it turns into a colored double tick
+- Logging out and back in still shows accurate online/offline
+  state (not stuck "online" forever)
+
+Commit with:
+  [Added] presence, typing indicators, and read receipts
+
+Then move to Phase 5 - Media Sharing in docs/05-FTL.md (group
+chat from Phase 3 can be picked back up whenever you're ready -
+nothing in Phase 4 or 5 depends on it).
