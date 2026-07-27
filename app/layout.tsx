@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { AuthListener } from "@/components/auth/AuthListener";
+import { PresenceTracker } from "@/components/chat/PresenceTracker";
 
 const geistSans = Geist({
     variable: "--font-geist-sans",
@@ -30,6 +31,7 @@ export default function RootLayout({
         >
             <body className="min-h-full flex flex-col" suppressHydrationWarning>
                 <AuthListener />
+                <PresenceTracker />
                 {children}
             </body>
         </html>

@@ -72,7 +72,7 @@ You should see SELECT, INSERT, and UPDATE listed.
 
 
 ----------------------------------------------------
-2. CREATE A ZUSTAND STORE FOR ONLINE PRESENCE
+2. CREATE A ZUSTAND STORE FOR ONLINE PRESENCE ✅
 ----------------------------------------------------
 
 Create lib/stores/presenceStore.ts:
@@ -94,7 +94,7 @@ This follows the exact same pattern as authStore.ts from Phase
 
 
 ----------------------------------------------------
-3. CREATE THE PRESENCE TRACKER (MOUNTS ONCE, LIKE AuthListener)
+3. CREATE THE PRESENCE TRACKER (MOUNTS ONCE, LIKE AuthListener) ✅
 ----------------------------------------------------
 
 Create components/chat/PresenceTracker.tsx:
@@ -102,9 +102,9 @@ Create components/chat/PresenceTracker.tsx:
 "use client";
 
 import { useEffect } from "react";
-import { createClient } from "@/lib/supabase/client";
-import { useAuthStore } from "@/lib/stores/authStore";
-import { usePresenceStore } from "@/lib/stores/presenceStore";
+import { createClient } from "@/libraries/supabase/client";
+import { useAuthStore } from "@/libraries/stores/authStore";
+import { usePresenceStore } from "@/libraries/stores/presenceStore";
 
 export function PresenceTracker() {
   const user = useAuthStore((s) => s.user);
@@ -161,7 +161,7 @@ import { PresenceTracker } from "@/components/chat/PresenceTracker";
 
 
 ----------------------------------------------------
-4. SHOW THE ONLINE DOT + "LAST SEEN" IN THE SIDEBAR
+4. SHOW THE ONLINE DOT + "LAST SEEN" IN THE SIDEBAR 
 ----------------------------------------------------
 
 For a direct conversation, we need to know WHO the other person
@@ -216,7 +216,7 @@ Now update the JSX that renders each conversation link to show
 the online dot and a name (finally resolving the "Direct
 message" placeholder from Phase 2/3):
 
-import { usePresenceStore } from "@/lib/stores/presenceStore";
+import { usePresenceStore } from "@/libraries/stores/presenceStore";
 
 // inside the component:
 const onlineUserIds = usePresenceStore((s) => s.onlineUserIds);

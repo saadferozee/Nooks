@@ -2,9 +2,9 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
-import { getPasswordChecks, isPasswordValid } from "@/lib/validation/password";
-import { useUsernameAvailability } from "@/lib/hooks/useUsernameAvailability";
+import { createClient } from "@/libraries/supabase/client";
+import { getPasswordChecks, isPasswordValid } from "@/libraries/validation/password";
+import { useUsernameAvailability } from "@/libraries/hooks/useUsernameAvailability";
 import { GoogleButton } from "./GoogleButton";
 
 type Step = 1 | 2 | 3;

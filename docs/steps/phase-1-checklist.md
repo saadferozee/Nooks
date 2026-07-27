@@ -73,7 +73,7 @@ Follow this checklist top to bottom. Test each step before moving to the next.
 
   import { useState } from "react";
   import { useRouter } from "next/navigation";
-  import { createClient } from "@/lib/supabase/client";
+  import { createClient } from "@/libraries/supabase/client";
 
   export default function SignupPage() {
     const router = useRouter();
@@ -218,7 +218,7 @@ Follow this checklist top to bottom. Test each step before moving to the next.
 - [x] Add a logout button anywhere in `app/(main)/` (e.g. a temporary button on the homepage for now):
   ```tsx
   "use client";
-  import { createClient } from "@/lib/supabase/client";
+  import { createClient } from "@/libraries/supabase/client";
   import { useRouter } from "next/navigation";
 
   export function LogoutButton() {

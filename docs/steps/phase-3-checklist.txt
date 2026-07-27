@@ -71,7 +71,7 @@ Create lib/hooks/useCreateGroup.ts:
 
 "use client";
 
-import { createClient } from "@/lib/supabase/client";
+import { createClient } from "@/libraries/supabase/client";
 
 export function useCreateGroup() {
   const supabase = createClient();
@@ -128,9 +128,9 @@ Create components/chat/CreateGroupForm.tsx:
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useUserSearch } from "@/lib/hooks/useUserSearch";
-import { useCreateGroup } from "@/lib/hooks/useCreateGroup";
-import { useAuthStore } from "@/lib/stores/authStore";
+import { useUserSearch } from "@/libraries/hooks/useUserSearch";
+import { useCreateGroup } from "@/libraries/hooks/useCreateGroup";
+import { useAuthStore } from "@/libraries/stores/authStore";
 
 type SelectedUser = { id: string; label: string };
 
@@ -357,9 +357,9 @@ Create components/chat/GroupInfoPanel.tsx:
 "use client";
 
 import { useEffect, useState } from "react";
-import { createClient } from "@/lib/supabase/client";
-import { useAuthStore } from "@/lib/stores/authStore";
-import { useUserSearch } from "@/lib/hooks/useUserSearch";
+import { createClient } from "@/libraries/supabase/client";
+import { useAuthStore } from "@/libraries/stores/authStore";
+import { useUserSearch } from "@/libraries/hooks/useUserSearch";
 
 type Member = {
   user_id: string;

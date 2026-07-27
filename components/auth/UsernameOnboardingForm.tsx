@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
-import { useUsernameAvailability } from "@/lib/hooks/useUsernameAvailability";
+import { createClient } from "@/libraries/supabase/client";
+import { useUsernameAvailability } from "@/libraries/hooks/useUsernameAvailability";
 
 export function UsernameOnboardingForm() {
     const router = useRouter();

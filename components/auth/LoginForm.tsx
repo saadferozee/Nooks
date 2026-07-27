@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import { createClient } from "@/libraries/supabase/client";
 import { GoogleButton } from "./GoogleButton";
 
 export function LoginForm() {

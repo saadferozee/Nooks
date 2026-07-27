@@ -123,7 +123,7 @@ Create lib/hooks/useStartConversation.ts:
 
 "use client";
 
-import { createClient } from "@/lib/supabase/client";
+import { createClient } from "@/libraries/supabase/client";
 
 export function useStartConversation() {
   const supabase = createClient();
@@ -185,8 +185,8 @@ Create components/chat/ConversationList.tsx:
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/client";
-import { useAuthStore } from "@/lib/stores/authStore";
+import { createClient } from "@/libraries/supabase/client";
+import { useAuthStore } from "@/libraries/stores/authStore";
 
 type ConversationRow = {
   conversation_id: string;
@@ -262,8 +262,8 @@ Create components/chat/ChatThread.tsx (static version first):
 "use client";
 
 import { useEffect, useState } from "react";
-import { createClient } from "@/lib/supabase/client";
-import { useAuthStore } from "@/lib/stores/authStore";
+import { createClient } from "@/libraries/supabase/client";
+import { useAuthStore } from "@/libraries/stores/authStore";
 
 type Message = {
   id: string;
