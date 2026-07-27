@@ -319,7 +319,7 @@ tradeoff, not an accident.
 
 
 ----------------------------------------------------
-6. ADD READ RECEIPTS - MARK MESSAGES AS DELIVERED
+6. ADD READ RECEIPTS - MARK MESSAGES AS DELIVERED ✅
 ----------------------------------------------------
 
 When a message arrives via the realtime subscription (from
@@ -341,7 +341,7 @@ sender doesn't need a delivery receipt for their own message.
 
 
 ----------------------------------------------------
-7. MARK MESSAGES AS "READ" WHEN THE CHAT IS OPEN
+7. MARK MESSAGES AS "READ" WHEN THE CHAT IS OPEN ✅
 ----------------------------------------------------
 
 Add a new useEffect in ChatThread.tsx that runs whenever the
@@ -372,7 +372,7 @@ insert here would fail on the primary key conflict.
 
 
 ----------------------------------------------------
-8. SHOW THE TICK MARKS ON YOUR OWN SENT MESSAGES
+8. SHOW THE TICK MARKS ON YOUR OWN SENT MESSAGES ✅
 ----------------------------------------------------
 
 Update the Message type and fetch in ChatThread.tsx to also
@@ -442,15 +442,10 @@ call Phase 4 done.
 ====================================================
 PHASE 4 COMPLETE WHEN:
 ====================================================
-- Sidebar shows a green dot next to people who are currently on
-  the site, gray for those who aren't
-- Opening a chat and typing shows "Typing..." on the OTHER
-  person's screen within a second or two, and it clears a couple
-  seconds after you stop
-- Sending a message shows a single tick; once the other person's
-  client marks it delivered, it becomes a double tick; once they
-  open the chat, it turns into a colored double tick
-- Logging out and back in still shows accurate online/offline
+✅ Sidebar shows a green dot next to people who are currently on the site, gray for those who aren't
+✅ Opening a chat and typing shows "Typing..." on the OTHER person's screen within a second or two, and it clears a couple seconds after you stop
+✅ Sending a message shows a single tick; once the other person's client marks it delivered, it becomes a double tick; once they open the chat, it turns into a colored double tick
+✅ Logging out and back in still shows accurate online/offline
   state (not stuck "online" forever)
 
 Commit with:

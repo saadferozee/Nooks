@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/libraries/supabase/client";
 import { useAuthStore } from "@/libraries/stores/AuthStore";
 
@@ -9,6 +9,7 @@ type Message = {
     sender_id: string;
     content: string;
     created_at: string;
+    status?: string;
 };
 
 export function ChatThread({ conversationId }: { conversationId: string }) {
@@ -31,6 +32,31 @@ export function ChatThread({ conversationId }: { conversationId: string }) {
     }, [conversationId]);
 
     useEffect(() => {
+        if (messages.length === 0) return;
+
+        const myMessageIds = messages
+            .filter((m) => m.sender_id === user?.id)
+            .map((m) => m.id);
+
+        if (myMessageIds.length === 0) return;
+
+        supabase
+            .from("message_status")
+            .select("message_id, status")
+            .in("message_id", myMessageIds)
+            .then(({ data }) => {
+                if (!data) return;
+                setMessages((prev) =>
+                    prev.map((m) => {
+                        const found = data.find((d) => d.message_id === m.id);
+                        return found ? { ...m, status: found.status } : m;
+                    }),
+                );
+            });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [messages.length]);
+
+    useEffect(() => {
         const channel = supabase
             .channel(`conversation:${conversationId}`)
             .on(
@@ -42,6 +68,16 @@ export function ChatThread({ conversationId }: { conversationId: string }) {
                     filter: `conversation_id=eq.${conversationId}`,
                 },
                 (payload) => {
+                    if (payload.new.sender_id !== user?.id) {
+                        supabase
+                            .from("message_status")
+                            .insert({
+                                message_id: payload.new.id,
+                                user_id: user?.id,
+                                status: "delivered",
+                            })
+                            .then();
+                    }
                     setMessages((prev) => [...prev, payload.new as Message]);
                 },
             )
@@ -52,6 +88,25 @@ export function ChatThread({ conversationId }: { conversationId: string }) {
         };
         // eslint-disable-next-line
     }, [conversationId]);
+
+    useEffect(() => {
+        if (!user || messages.length === 0) return;
+
+        const unreadFromOthers = messages.filter(
+            (m) => m.sender_id !== user.id,
+        );
+
+        unreadFromOthers.forEach((m) => {
+            supabase
+                .from("message_status")
+                .upsert(
+                    { message_id: m.id, user_id: user.id, status: "read" },
+                    { onConflict: "message_id,user_id" },
+                )
+                .then();
+        });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [messages, user]);
 
     // ? this is for checking typing status.
     useEffect(() => {
@@ -71,7 +126,6 @@ export function ChatThread({ conversationId }: { conversationId: string }) {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [conversationId]);
 
-    let typingTimeout: NodeJS.Timeout;
     function handleInputChange(value: string) {
         setInput(value);
         const channel = supabase.channel(`typing:${conversationId}`);
@@ -101,13 +155,75 @@ export function ChatThread({ conversationId }: { conversationId: string }) {
                 {messages.map((m) => (
                     <div
                         key={m.id}
-                        className={`max-w-xs rounded-neo px-4 py-2 ${
+                        className={`flex flex-col ${
                             m.sender_id === user?.id
-                                ? "ml-auto bg-primary-light text-white dark:bg-primary-dark"
-                                : "bg-surface-light text-ink-light dark:bg-surface-dark dark:text-ink-dark"
+                                ? "justify-end"
+                                : "justify-start"
                         }`}
                     >
-                        {m.content}
+                        <div
+                            className={`flex flex-col justify-between rounded-neo px-4 py-2 ${
+                                m.sender_id === user?.id
+                                    ? "max-w-lg  ml-auto bg-primary-light text-justify text-white dark:bg-primary-dark"
+                                    : "max-w-lg mr-auto bg-surface-light text-justify text-ink-light dark:bg-surface-dark dark:text-ink-dark"
+                            }`}
+                        >
+                            {m.content}
+                        </div>
+                        {m.sender_id === user?.id ? (
+                            <div className="flex justify-end text-end">
+                                <p className="pr-2 text-sm text-ink-light/50 dark:text-ink-dark/50">
+                                    {`${new Date(
+                                        m.created_at,
+                                    ).toLocaleDateString("en-US", {
+                                        day: "numeric",
+                                        month: "short",
+                                    })}, 
+                                    ${new Date(m.created_at).toLocaleTimeString(
+                                        "en-US",
+                                        {
+                                            hour: "numeric",
+                                            minute: "2-digit",
+                                            hour12: true,
+                                        },
+                                    )}
+                                    `}
+                                </p>
+                                <p className="w-6 ml-1 text-center text-xs">
+                                    {m.status === "read" ? (
+                                        <span className="text-green-600 dark:text-green-200">
+                                            ✓✓
+                                        </span>
+                                    ) : m.status === "delivered" ? (
+                                        <span className="text-primary-light/70 dark:text-primary-dark/70">
+                                            ✓✓
+                                        </span>
+                                    ) : (
+                                        <span className="text-primary-light/70 dark:text-primary-dark">✓</span>
+                                    )}
+                                </p>
+                            </div>
+                        ) : (
+                            <p className="pl-4 text-start text-sm">
+                                <span className="text-ink-light/50 dark:text-ink-dark/50">
+                                    {`${new Date(
+                                        m.created_at,
+                                    ).toLocaleDateString("en-US", {
+                                        day: "numeric",
+                                        month: "short",
+                                    })}, 
+                                    ${new Date(m.created_at).toLocaleTimeString(
+                                        "en-US",
+                                        {
+                                            hour: "numeric",
+                                            minute: "2-digit",
+                                            hour12: true,
+                                        },
+                                    )}
+                                    `}
+                                </span>
+                            </p>
+                        )}
                     </div>
                 ))}
             </div>
