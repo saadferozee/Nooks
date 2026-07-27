@@ -27,3 +27,10 @@ details: when a user in mobile device or smaller screen, they face a sidewise sc
 
 
 -----------------
+
+[ ] lazy load for messages
+
+details: message should be display only 30 messages, and last 30 messages, if user scroll up, then loads next 30, and so on.
+
+
+-----------------

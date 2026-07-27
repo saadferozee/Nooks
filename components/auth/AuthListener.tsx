@@ -4,8 +4,8 @@ import { useEffect } from "react";
 import { createClient } from "@/libraries/supabase/client";
 import { useAuthStore } from "@/libraries/stores/AuthStore";
 
-// mounts at the root, nothing renders
-// sync with Supabase auth state
+// ? mounts at the root, nothing renders
+// ? sync with Supabase auth state
 
 export function AuthListener() {
     const setUser = useAuthStore((state) => state.setUser);
@@ -15,7 +15,8 @@ export function AuthListener() {
         const supabase = createClient();
 
         supabase.auth.getUser().then(({ data }) => {
-            console.log(data);
+            // console.log(data); 
+            // ? it was for checking the user data.
             setUser(data.user);
             setLoading(false);
         });
