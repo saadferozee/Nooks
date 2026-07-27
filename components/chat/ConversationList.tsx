@@ -116,11 +116,11 @@ export function ConversationList() {
                             <Link
                                 key={c.conversation_id}
                                 href={`/chat/${c.conversation_id}`}
-                                className="flex items-center gap-2 rounded-neo bg-base-light px-4 py-3 text-ink-light shadow-neo-raised dark:bg-base-dark dark:text-ink-dark dark:shadow-neo-raised-dark"
+                                className="flex items-center gap-2 rounded-neo bg-surface-light/60 px-4 py-3 text-ink-light dark:bg-surface-dark/70 dark:text-ink-dark"
                             >
                                 {c.conversations.type === "direct" && (
                                     <span
-                                        className={`h-2 w-2 rounded-full ${
+                                        className={`h-3 w-3 rounded-full ${
                                             isOnline
                                                 ? "bg-online-light dark:bg-online-dark"
                                                 : "bg-ink-light/30 dark:bg-ink-dark/30"
