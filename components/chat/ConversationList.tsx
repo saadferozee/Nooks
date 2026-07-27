@@ -97,7 +97,7 @@ export function ConversationList() {
     const onlineUserIds = usePresenceStore((s) => s.onlineUserIds);
 
     return (
-        <div className="h-screen flex flex-col justify-between p-4">
+        <div className="h-full flex flex-col justify-between p-4">
             <div className="flex flex-col gap-4">
                 <UserSearch />
 

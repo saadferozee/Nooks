@@ -7,7 +7,7 @@ export default function MainLayout({
 }) {
     return (
         <div className="flex h-screen">
-            <aside className="w-72 border-r border-ink-light/10 dark:border-ink-dark/10">
+            <aside className="min-w-72 w-[30%] m-5 rounded-[30px] shadow-neo-raised dark:shadow-neo-raised-dark">
                 <ConversationList />
             </aside>
             <main className="flex-1">{children}</main>

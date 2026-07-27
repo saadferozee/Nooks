@@ -37,7 +37,7 @@ export function UserSearch() {
                 placeholder="Search people..."
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                className="rounded-neo bg-base-light px-4 py-2 text-sm text-ink-light shadow-neo-pressed outline-none dark:bg-base-dark dark:text-ink-dark dark:shadow-neo-pressed-dark"
+                className="h-12 rounded-neo bg-base-light px-4 py-2 text-sm text-ink-light shadow-neo-pressed outline-none dark:bg-base-dark dark:text-ink-dark dark:shadow-neo-pressed-dark"
             />
 
             {query.trim().length >= 2 && (

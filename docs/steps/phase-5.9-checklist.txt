@@ -12,7 +12,7 @@ end up rewriting client logic twice.
 PHASE 0 — BEFORE YOU START
 ====================================================
 
-[ ] Create a new git branch: fix/production-readiness
+[x] Create a new git branch: fix/production-readiness
 [ ] Take a full backup / export of current Supabase schema and data
 [ ] Confirm RLS is currently working correctly on messages,
     message_status, conversations, conversation_participants
