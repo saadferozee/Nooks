@@ -161,7 +161,7 @@ import { PresenceTracker } from "@/components/chat/PresenceTracker";
 
 
 ----------------------------------------------------
-4. SHOW THE ONLINE DOT + "LAST SEEN" IN THE SIDEBAR 
+4. SHOW THE ONLINE DOT + "LAST SEEN" IN THE SIDEBAR ✅
 ----------------------------------------------------
 
 For a direct conversation, we need to know WHO the other person
@@ -256,7 +256,7 @@ a green dot if they're currently on the site, gray if not.
 
 
 ----------------------------------------------------
-5. ADD THE TYPING INDICATOR (BROADCAST CHANNEL)
+5. ADD THE TYPING INDICATOR (BROADCAST CHANNEL) ✅
 ----------------------------------------------------
 
 This uses Broadcast, not Postgres Changes - nothing gets written

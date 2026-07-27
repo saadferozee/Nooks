@@ -16,6 +16,7 @@ export function ChatThread({ conversationId }: { conversationId: string }) {
     const user = useAuthStore((s) => s.user);
     const [messages, setMessages] = useState<Message[]>([]);
     const [input, setInput] = useState("");
+    const [typingUser, setTypingUser] = useState<string | null>(null);
 
     useEffect(() => {
         supabase
@@ -52,6 +53,35 @@ export function ChatThread({ conversationId }: { conversationId: string }) {
         // eslint-disable-next-line
     }, [conversationId]);
 
+    // ? this is for checking typing status.
+    useEffect(() => {
+        const channel = supabase
+            .channel(`typing:${conversationId}`)
+            .on("broadcast", { event: "typing" }, (payload) => {
+                if (payload.payload.userId !== user?.id) {
+                    setTypingUser(payload.payload.userId);
+                    setTimeout(() => setTypingUser(null), 2000);
+                }
+            })
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [conversationId]);
+
+    let typingTimeout: NodeJS.Timeout;
+    function handleInputChange(value: string) {
+        setInput(value);
+        const channel = supabase.channel(`typing:${conversationId}`);
+        channel.send({
+            type: "broadcast",
+            event: "typing",
+            payload: { userId: user?.id },
+        });
+    }
+
     async function handleSend(e: React.FormEvent) {
         e.preventDefault();
         if (!input.trim() || !user) return;
@@ -82,10 +112,16 @@ export function ChatThread({ conversationId }: { conversationId: string }) {
                 ))}
             </div>
 
+            {typingUser && (
+                <p className="px-1 text-xs text-ink-light/50 dark:text-ink-dark/50">
+                    Typing...
+                </p>
+            )}
+
             <form onSubmit={handleSend} className="flex gap-2 pt-4">
                 <input
                     value={input}
-                    onChange={(e) => setInput(e.target.value)}
+                    onChange={(e) => handleInputChange(e.target.value)}
                     placeholder="Type a message"
                     className="flex-1 rounded-neo bg-base-light px-4 py-3 text-ink-light shadow-neo-pressed outline-none dark:bg-base-dark dark:text-ink-dark dark:shadow-neo-pressed-dark"
                 />
