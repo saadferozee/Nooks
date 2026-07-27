@@ -6,6 +6,7 @@ import { UserSearch } from "@/components/chat/UserSearch";
 import { createClient } from "@/libraries/supabase/client";
 import { useAuthStore } from "@/libraries/stores/AuthStore";
 import { usePresenceStore } from "@/libraries/stores/presenceStore";
+import LogoutButton from "../auth/LogoutButton";
 
 type ConversationRow = {
     conversation_id: string;
@@ -96,40 +97,43 @@ export function ConversationList() {
     const onlineUserIds = usePresenceStore((s) => s.onlineUserIds);
 
     return (
-        <div className="flex flex-col gap-4 p-4">
-            <UserSearch />
+        <div className="h-screen flex flex-col justify-between p-4">
+            <div className="flex flex-col gap-4">
+                <UserSearch />
 
-            <div className="flex flex-col gap-2">
-                {conversations.map((c) => {
-                    const isOnline =
-                        c.otherUser && onlineUserIds.has(c.otherUser.id);
-                    const label =
-                        c.conversations.type === "group"
-                            ? c.conversations.name
-                            : (c.otherUser?.display_name ??
-                              c.otherUser?.username ??
-                              "can't find name: error!");
+                <div className="flex flex-col gap-2">
+                    {conversations.map((c) => {
+                        const isOnline =
+                            c.otherUser && onlineUserIds.has(c.otherUser.id);
+                        const label =
+                            c.conversations.type === "group"
+                                ? c.conversations.name
+                                : (c.otherUser?.display_name ??
+                                  c.otherUser?.username ??
+                                  "can't find name: error!");
 
-                    return (
-                        <Link
-                            key={c.conversation_id}
-                            href={`/chat/${c.conversation_id}`}
-                            className="flex items-center gap-2 rounded-neo bg-base-light px-4 py-3 text-ink-light shadow-neo-raised dark:bg-base-dark dark:text-ink-dark dark:shadow-neo-raised-dark"
-                        >
-                            {c.conversations.type === "direct" && (
-                                <span
-                                    className={`h-2 w-2 rounded-full ${
-                                        isOnline
-                                            ? "bg-online-light dark:bg-online-dark"
-                                            : "bg-ink-light/30 dark:bg-ink-dark/30"
-                                    }`}
-                                />
-                            )}
-                            {label}
-                        </Link>
-                    );
-                })}
+                        return (
+                            <Link
+                                key={c.conversation_id}
+                                href={`/chat/${c.conversation_id}`}
+                                className="flex items-center gap-2 rounded-neo bg-base-light px-4 py-3 text-ink-light shadow-neo-raised dark:bg-base-dark dark:text-ink-dark dark:shadow-neo-raised-dark"
+                            >
+                                {c.conversations.type === "direct" && (
+                                    <span
+                                        className={`h-2 w-2 rounded-full ${
+                                            isOnline
+                                                ? "bg-online-light dark:bg-online-dark"
+                                                : "bg-ink-light/30 dark:bg-ink-dark/30"
+                                        }`}
+                                    />
+                                )}
+                                {label}
+                            </Link>
+                        );
+                    })}
+                </div>
             </div>
+            <LogoutButton />
         </div>
     );
 }
