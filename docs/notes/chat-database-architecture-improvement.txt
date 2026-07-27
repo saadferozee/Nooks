@@ -1,0 +1,418 @@
+Chat Database Architecture Review & Refactoring Instructions
+=============================================================
+
+Goal:
+Improve the database architecture to support a scalable, production-ready realtime chat system similar to WhatsApp, Telegram, or Messenger.
+
+--------------------------------------------------
+1. Keep Current Table Structure
+--------------------------------------------------
+
+The following tables are well designed and should remain:
+
+- profiles
+- conversations
+- conversation_participants
+- messages
+- message_status
+
+Do not merge these tables.
+
+The separation of message_status from messages is correct because each message can have a different status for each participant.
+
+--------------------------------------------------
+2. Profiles Improvements
+--------------------------------------------------
+
+Add:
+
+- updated_at timestamptz
+
+Purpose:
+- Track profile updates.
+- Detect avatar changes.
+- Detect username/display name changes.
+
+--------------------------------------------------
+3. Conversations Improvements
+--------------------------------------------------
+
+Add:
+
+- last_message_id uuid
+- last_message_at timestamptz
+
+Purpose:
+
+- Quickly sort conversation list.
+- Avoid expensive joins every time conversations are loaded.
+
+Conversation list should be ordered by:
+
+last_message_at DESC
+
+--------------------------------------------------
+4. Conversation Participants Improvements
+--------------------------------------------------
+
+Add one of the following:
+
+Option A
+--------
+last_read_message_id uuid
+
+Option B
+--------
+last_read_at timestamptz
+
+Purpose:
+
+- Calculate unread counts efficiently.
+- Avoid checking every message_status row.
+
+--------------------------------------------------
+5. Messages Improvements
+--------------------------------------------------
+
+Add:
+
+edited_at timestamptz
+
+deleted_at timestamptz
+
+reply_to uuid
+
+is_deleted boolean default false
+
+Purpose:
+
+- Edit message
+- Delete message
+- Reply to message
+- Soft delete support
+
+Never hard delete messages unless absolutely necessary.
+
+--------------------------------------------------
+6. Message Status Table
+--------------------------------------------------
+
+Keep the current primary key:
+
+PRIMARY KEY (message_id, user_id)
+
+This is the correct design.
+
+Do not replace it with a single id column.
+
+--------------------------------------------------
+7. Replace Free Text Status
+--------------------------------------------------
+
+Current:
+
+status text
+
+Replace with:
+
+Enum
+
+or
+
+CHECK constraint
+
+Allowed values:
+
+- sent
+- delivered
+- read
+
+Never allow arbitrary text.
+
+--------------------------------------------------
+8. Add Database Indexes
+--------------------------------------------------
+
+Messages
+
+CREATE INDEX
+(conversation_id, created_at)
+
+Purpose:
+
+Fast message loading.
+
+--------------------------------
+
+Conversation Participants
+
+CREATE INDEX
+(user_id)
+
+Purpose:
+
+Fast conversation lookup.
+
+--------------------------------
+
+Message Status
+
+CREATE INDEX
+(message_id)
+
+Purpose:
+
+Fast status lookup.
+
+--------------------------------
+
+Message Status
+
+CREATE INDEX
+(user_id)
+
+Purpose:
+
+Fast unread/read queries.
+
+--------------------------------------------------
+9. Move Delivery Logic To Database
+--------------------------------------------------
+
+Current problem:
+
+Client inserts delivered rows.
+
+This creates race conditions.
+
+Required architecture:
+
+Sender
+↓
+
+Insert message
+
+↓
+
+Database Trigger (or Edge Function)
+
+↓
+
+Automatically create delivered rows
+
+↓
+
+Realtime event
+
+↓
+
+Receiver updates read status
+
+↓
+
+Realtime update back to sender
+
+Client should NEVER insert delivered rows.
+
+--------------------------------------------------
+10. Client Responsibility
+--------------------------------------------------
+
+Client should only:
+
+- Send messages
+- Mark messages as read
+- Display realtime updates
+
+Client should NOT:
+
+- Create delivered rows
+- Perform duplicate inserts
+- Manage delivery lifecycle
+
+--------------------------------------------------
+11. Realtime Architecture
+--------------------------------------------------
+
+Listen for:
+
+messages INSERT
+
+message_status UPDATE
+
+conversation updates
+
+presence updates
+
+Do not rely only on message INSERT events.
+
+--------------------------------------------------
+12. Read Receipt Optimization
+--------------------------------------------------
+
+Use:
+
+conversation_participants.last_read_message_id
+
+or
+
+last_read_at
+
+to calculate unread messages efficiently.
+
+Avoid scanning the entire message_status table whenever possible.
+
+--------------------------------------------------
+13. Soft Delete Strategy
+--------------------------------------------------
+
+Never permanently remove messages.
+
+Instead:
+
+is_deleted = true
+
+deleted_at = current_timestamp
+
+Display:
+
+"This message was deleted."
+
+--------------------------------------------------
+14. Future Features
+--------------------------------------------------
+
+Prepare the schema for:
+
+- Reply
+- Forward
+- Edit
+- Delete
+- Reactions
+- Attachments
+- Voice messages
+- Images
+- Videos
+- Files
+- Pinned messages
+
+--------------------------------------------------
+15. Presence System
+--------------------------------------------------
+
+Current columns:
+
+status
+
+last_seen
+
+are acceptable.
+
+For realtime presence, prefer Supabase Presence instead of continuously updating the database.
+
+Update last_seen only when necessary.
+
+--------------------------------------------------
+16. Conversation List Optimization
+--------------------------------------------------
+
+Do not calculate latest message using joins every time.
+
+Store:
+
+last_message_id
+
+last_message_at
+
+inside conversations.
+
+Update these values whenever a new message is created.
+
+--------------------------------------------------
+17. Security
+--------------------------------------------------
+
+Enable Row Level Security on every table.
+
+Write policies for:
+
+SELECT
+
+INSERT
+
+UPDATE
+
+DELETE
+
+Ensure users can only access conversations they participate in.
+
+--------------------------------------------------
+18. Performance Goals
+--------------------------------------------------
+
+Database should support:
+
+- Fast conversation loading
+- Fast message loading
+- Fast unread count calculation
+- Fast read receipt updates
+- Efficient indexes
+- Minimal joins
+- Minimal duplicate queries
+
+--------------------------------------------------
+19. Scalability Goals
+--------------------------------------------------
+
+The architecture should support:
+
+- One-to-one chats
+- Group chats
+- Large conversations
+- Thousands of messages
+- Millions of status records
+
+without redesigning the schema.
+
+--------------------------------------------------
+20. Final Architecture Flow
+--------------------------------------------------
+
+User sends message
+↓
+
+Insert into messages
+↓
+
+Database trigger creates delivered rows in message_status
+↓
+
+Realtime broadcasts new message
+↓
+
+Receiver opens conversation
+↓
+
+Client updates message_status to read
+↓
+
+Realtime broadcasts read status
+↓
+
+Sender receives updated read receipt
+
+--------------------------------------------------
+Final Objective
+--------------------------------------------------
+
+The completed database should provide:
+
+✓ Clean relational design
+✓ Proper normalization
+✓ Efficient indexing
+✓ Scalable message storage
+✓ Reliable read receipts
+✓ No race conditions
+✓ Fast conversation loading
+✓ Future-proof architecture
+✓ Production-ready realtime behavior

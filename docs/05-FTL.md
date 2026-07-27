@@ -17,18 +17,18 @@ Broken into 6 phases with a realistic timeline for a solo developer. Each phase 
 - [x] Signup/Login page UI (neomorphic form)
 - [x] Supabase Auth integration (email/password)
 - [x] `profiles` table + trigger (auto-create profile on signup)
-- [ ] Protected route middleware (via Next.js middleware.ts)
+- [x] Protected route middleware (via Next.js middleware.ts)
 - [x] Logout functionality
-- [ ] **Milestone:** users can sign up/log in and land on the dashboard
+- [x] **Milestone:** users can sign up/log in and land on the dashboard
 
 ## Phase 2: Core 1:1 Messaging (5-6 days)
-- [ ] Create `conversations`, `conversation_participants`, `messages` tables
-- [ ] Write and test RLS policies (for every table)
-- [ ] User search + creating a new conversation
-- [ ] Send/display messages (static fetch first, no realtime yet)
-- [ ] Subscribe to Supabase Realtime for instant message updates
+- [x] Create `conversations`, `conversation_participants`, `messages` tables
+- [x] Write and test RLS policies (for every table)
+- [x] User search + creating a new conversation
+- [x] Send/display messages (static fetch first, no realtime yet)
+- [x] Subscribe to Supabase Realtime for instant message updates
 - [ ] Message bubble UI (distinct sent vs received styles)
-- [ ] **Milestone:** two users can exchange 1:1 messages in real time
+- [x] **Milestone:** two users can exchange 1:1 messages in real time
 
 ## Phase 3: Group Chat (3-4 days)
 - [ ] Group creation UI + multi-select member picker
@@ -38,11 +38,12 @@ Broken into 6 phases with a realistic timeline for a solo developer. Each phase 
 - [ ] **Milestone:** 3+ users can message in a group
 
 ## Phase 4: Realtime Presence Features (3-4 days)
-- [ ] Set up Presence channel (online/offline)
-- [ ] Online status dot + "Last seen" UI
-- [ ] Typing indicator via Broadcast channel
-- [ ] `message_status` table + read receipt logic (✓ / ✓✓ / blue ✓✓)
-- [ ] **Milestone:** full WhatsApp-style realtime feedback works
+- [x] Set up Presence channel (online/offline)
+- [x] Online status dot
+- [ ] "Last seen" UI
+- [x] Typing indicator via Broadcast channel
+- [x] `message_status` table + read receipt logic (✓ / ✓✓ / green ✓✓)
+- [x] **Milestone:** full WhatsApp-style realtime feedback works
 
 ## Phase 5: Media Sharing (2-3 days)
 - [ ] Create Supabase Storage bucket + RLS policy

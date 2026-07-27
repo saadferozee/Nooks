@@ -1,0 +1,378 @@
+NOOKS CHAT APP — PRODUCTION READINESS INSTRUCTIONS
+====================================================
+Purpose: Single ordered checklist covering UI bug fixes, database
+architecture changes, and realtime/client refactoring — merged from
+the 3 review documents into one execution order.
+
+Follow the phases IN ORDER. Do not skip ahead to hooks/refactoring
+(Phase 4) before the database trigger (Phase 2) is done — you will
+end up rewriting client logic twice.
+
+====================================================
+PHASE 0 — BEFORE YOU START
+====================================================
+
+[ ] Create a new git branch: fix/production-readiness
+[ ] Take a full backup / export of current Supabase schema and data
+[ ] Confirm RLS is currently working correctly on messages,
+    message_status, conversations, conversation_participants
+[ ] Write down current known-good test scenario:
+    - 2 users, 1 conversation, send a message, confirm it appears
+    for both, before you change anything (this is your regression
+    baseline)
+
+====================================================
+PHASE 1 — QUICK UI BUG FIXES (low/medium effort, high visible payoff)
+====================================================
+
+1.1 Auto-scroll on new message
+--------------------------------
+Problem: New message appears at the bottom but view doesn't scroll,
+user has to scroll manually.
+
+Steps:
+[ ] Add a ref to the last message element (or a bottom sentinel div)
+[ ] On messages array change (new message added), call
+    scrollIntoView({ behavior: "smooth", block: "end" }) on that ref
+[ ] Only auto-scroll if:
+      - the new message was sent by the current user, OR
+      - the user was already scrolled near the bottom
+    (so it doesn't yank the screen while someone is reading old
+    messages after scrolling up — this matters once Phase 5
+    lazy-load is added)
+[ ] Test: send a message while scrolled to bottom → should scroll.
+    Scroll up to read history, have the other user send a message →
+    should NOT force-scroll, should show a "new message" pill/badge
+    instead (optional but recommended).
+
+1.2 Sidebar shows static "Direct Message" instead of real name
+------------------------------------------------------------------
+Problem: Sidebar conversation list shows hardcoded text instead of
+the other participant's name.
+
+Steps:
+[ ] Confirm conversation_participants + profiles join is available
+    when fetching the conversation list
+[ ] For each conversation, resolve "the other participant" (i.e.
+    participant where user_id != current_user_id)
+[ ] Display that participant's display_name / username from profiles
+[ ] Handle group chats separately if/when they exist (skip for now
+    if Nooks is 1:1 only)
+[ ] Test: two different test accounts should show two different
+    names in the sidebar, not the same static label
+
+1.3 No active/selected conversation indicator
+-----------------------------------------------
+Problem: User can't tell which conversation is currently open.
+
+Steps:
+[ ] Derive "is this row active" by comparing the row's conversation_id
+    to the currently open conversation id (from route param or state)
+[ ] Apply a distinct style (border, background, left accent bar) when
+    active — should be visually obvious, not just a subtle color shift
+[ ] Test: click between two conversations, confirm the highlighted
+    row updates correctly and only one row is ever highlighted
+
+1.4 Sidebar can't toggle on mobile / causes horizontal scroll
+-----------------------------------------------------------------
+Problem: On small screens, sidebar overflows instead of collapsing,
+causing sideways scroll — bad UX.
+
+Steps:
+[ ] Add a boolean UI state: isSidebarOpen (default true on desktop,
+    false on mobile — use a media query / breakpoint check)
+[ ] Convert sidebar into a slide-in drawer on mobile (position fixed,
+    transform translateX, transition)
+[ ] Add a hamburger/menu toggle button visible only on mobile
+[ ] Add an overlay/backdrop that closes the sidebar on tap-outside
+[ ] Ensure body/container never allows horizontal overflow
+    (overflow-x: hidden on the outer wrapper as a safety net, but
+    fix the root cause — don't just mask it)
+[ ] Test on actual mobile width (375px) and tablet width (768px),
+    not just by shrinking desktop browser
+
+====================================================
+PHASE 2 — DATABASE ARCHITECTURE FIXES (do before touching client hooks)
+====================================================
+
+2.1 Schema additions
+------------------------
+[ ] profiles: add updated_at timestamptz
+[ ] conversations: add last_message_id uuid, last_message_at timestamptz
+[ ] conversation_participants: add last_read_at timestamptz
+    (chosen over last_read_message_id — simpler comparisons, cheaper
+    queries; revisit only if you later need per-message "seen by"
+    avatars)
+[ ] messages: add edited_at timestamptz, deleted_at timestamptz,
+    reply_to uuid (nullable, FK to messages.id),
+    is_deleted boolean default false
+[ ] Do NOT merge message_status into messages. Keep them separate —
+    this is correct as-is, since each message can have a different
+    status per participant.
+[ ] Keep message_status primary key as-is:
+    PRIMARY KEY (message_id, user_id)
+
+2.2 Replace free-text status column
+----------------------------------------
+[ ] Convert message_status.status from plain text to either:
+      - a Postgres ENUM type ('sent', 'delivered', 'read'), or
+      - a CHECK constraint restricting to those 3 values
+[ ] Do this now while the table is small — migrating later with live
+    data rows is significantly more painful
+[ ] Update all existing rows to conform before adding the constraint
+
+2.3 Add indexes
+--------------------
+[ ] messages: CREATE INDEX ON messages (conversation_id, created_at)
+[ ] conversation_participants: CREATE INDEX ON conversation_participants (user_id)
+[ ] message_status: CREATE INDEX ON message_status (message_id)
+[ ] message_status: CREATE INDEX ON message_status (user_id)
+
+2.4 Move delivery logic into the database (HIGH PRIORITY)
+----------------------------------------------------------------
+This is the single highest-leverage change — it removes the
+INSERT/UPSERT race condition at the source instead of patching it
+client-side.
+
+[ ] Write a Postgres trigger function that fires AFTER INSERT ON
+    messages
+[ ] Inside the trigger: for every participant in
+    conversation_participants for that conversation EXCEPT the
+    sender, insert one message_status row with status = 'delivered'
+[ ] Use ON CONFLICT DO NOTHING (or appropriate upsert conflict
+    target) on (message_id, user_id) in case of retries
+[ ] Remove ALL client-side code that manually inserts "delivered"
+    rows — this responsibility now belongs entirely to the database
+[ ] Client will ONLY ever upsert status = 'read' rows going forward,
+    never 'delivered'
+[ ] Test: send a message from user A → confirm a 'delivered' row for
+    user B appears automatically without any client code running it
+
+2.5 Update conversations.last_message_id / last_message_at
+------------------------------------------------------------------
+[ ] Either via the same trigger from 2.4, or a separate AFTER INSERT
+    trigger on messages: update the parent conversation's
+    last_message_id and last_message_at
+[ ] Update conversation list query to ORDER BY last_message_at DESC
+    instead of joining messages every time
+
+2.6 Row Level Security
+---------------------------
+[ ] Confirm RLS is enabled on ALL 5 tables: profiles, conversations,
+    conversation_participants, messages, message_status
+[ ] Write/verify SELECT, INSERT, UPDATE, DELETE policies for each
+[ ] Core rule to verify everywhere: a user can only read/write rows
+    belonging to conversations they are a participant in
+[ ] Specifically re-test policies after adding the trigger in 2.4 —
+    triggers run with the permissions of the function owner
+    (typically bypass RLS if SECURITY DEFINER), so double check this
+    doesn't accidentally open a hole
+[ ] Test with 2 separate accounts: user A must never be able to
+    query user B's conversations they're not part of
+
+2.7 Soft delete strategy (prep only, not urgent)
+-----------------------------------------------------
+[ ] Never hard-delete message rows
+[ ] Deleting a message = set is_deleted = true, deleted_at = now()
+[ ] UI should render "This message was deleted." for such rows
+    (can be deferred to a later feature pass — just don't block on it
+    now, only make sure schema supports it per 2.1)
+
+====================================================
+PHASE 3 — FIX RACE CONDITIONS & DUPLICATE MESSAGES (client-side)
+====================================================
+Do this AFTER Phase 2's trigger is live and tested — it removes half
+of this phase's problem surface automatically.
+
+3.1 Remove remaining INSERT/UPSERT conflicts
+--------------------------------------------------
+[ ] Confirm client no longer inserts 'delivered' status anywhere
+    (should already be true after 2.4)
+[ ] Client only ever UPSERTs 'read' status, with the correct
+    ON CONFLICT target matching (message_id, user_id)
+[ ] Status flow is strictly: sent → delivered → read, enforced by
+    DB constraint order if possible (or at minimum in application
+    logic)
+
+3.2 Batch status updates
+-----------------------------
+[ ] Collect all currently-unread message IDs for the open
+    conversation into an array
+[ ] Send ONE upsert call with the full array of rows
+[ ] Remove any forEach/map loop that calls supabase upsert per
+    message — this must become a single batched call
+
+3.3 Prevent continuous read-update loop
+--------------------------------------------
+[ ] Read-status update should fire ONLY when:
+      - the chat is first opened, OR
+      - a new unread message arrives while chat is already open
+[ ] It must NOT fire on every re-render / every messages state change
+[ ] Use a ref or a guarded effect with a proper dependency array to
+    enforce this (see 3.7)
+
+3.4 Prevent duplicate messages (fetch + realtime overlap)
+------------------------------------------------------------------
+[ ] Before appending a realtime INSERT event to state, check if a
+    message with that id already exists in the current array
+[ ] If it exists, ignore/skip it
+[ ] This covers the case where the initial fetch and a realtime
+    event both deliver the same message
+
+3.5 Maintain message order
+-------------------------------
+[ ] After inserting any realtime message into state, re-sort the
+    array by created_at
+[ ] Do not assume realtime events always arrive in order
+
+3.6 Optimistic UI + isSending guard
+----------------------------------------
+[ ] On send: immediately render the outgoing message with a
+    temporary client-generated id and a "sending" visual state
+    (e.g. slightly faded, or a small clock icon)
+[ ] On DB confirmation: replace the temp message with the real row
+    (match by temp id → swap for server id), or reconcile via 3.4's
+    duplicate check
+[ ] Add isSending boolean state; disable the send button / prevent
+    additional submit while a send is in flight, to stop double-send
+    on double-click
+
+3.7 Fix useEffect dependencies
+-----------------------------------
+[ ] Audit every useEffect involved in messages/typing/status logic
+[ ] Remove eslint-disable-next-line comments that are hiding a real
+    missing-dependency bug — fix the actual dependency instead
+[ ] Confirm no stale closures (e.g. an effect referencing a state
+    variable from an outdated render)
+
+3.8 Error handling
+-----------------------
+[ ] Every supabase call (select/insert/upsert/delete) must check
+    the returned error object
+[ ] Log meaningful debug info (which operation, which id, the error
+    message) — not just console.log(error)
+[ ] Where relevant to the user (e.g. send failed), show a visible
+    inline error/retry affordance instead of failing silently
+
+3.9 Status lookup performance
+----------------------------------
+[ ] Replace any pattern where data.find() runs inside a .map() loop
+    (O(n²)) with a Map built once from the status array, then do
+    O(1) lookups per message while rendering
+
+====================================================
+PHASE 4 — TYPING INDICATOR FIXES
+====================================================
+
+4.1 Stop creating a new channel per keystroke
+--------------------------------------------------
+[ ] Create the typing realtime channel exactly once (on mount)
+[ ] Store the channel instance in a useRef, not component state
+[ ] Never call supabase.channel(...) inside handleInputChange() or
+    any per-keystroke handler — reuse the ref'd channel
+
+4.2 Subscribe before broadcasting
+--------------------------------------
+[ ] Call .subscribe() once, and only send typing broadcast events
+    after the subscription callback confirms status === 'SUBSCRIBED'
+[ ] Guard broadcast calls so they no-op if the channel isn't ready
+    yet
+
+4.3 Debounce/clear typing timeouts
+---------------------------------------
+[ ] Store the "stop typing" timeout id in a useRef
+[ ] On every keystroke: clearTimeout the previous one before setting
+    a new one, so you don't stack timeouts
+[ ] On unmount: clear any pending timeout (see Phase 6)
+
+====================================================
+PHASE 5 — LAZY LOAD / PAGINATION
+====================================================
+This is the highest-complexity item — do it after Phases 1-4 are
+stable, since it touches both the query layer and scroll/UI behavior
+together.
+
+[ ] Change initial message fetch to load only the latest 30 messages
+    (ORDER BY created_at DESC LIMIT 30, then reverse for display)
+[ ] On scroll-to-top (or near-top) of the message list, fetch the
+    next 30 older messages using created_at < oldest_loaded_message
+    as the cursor — avoid large IN(...) queries, use range/cursor
+    pagination instead
+[ ] Prepend older messages to state without losing current scroll
+    position (capture scrollHeight before prepend, restore offset
+    after DOM update so the view doesn't jump)
+[ ] Combine with 3.4's dedupe check — a message loaded via
+    pagination could theoretically overlap with one added via
+    realtime
+[ ] Combine with 1.1's auto-scroll logic — auto-scroll-to-bottom
+    must NOT fire when the user is loading older history, only on
+    genuinely new incoming/outgoing messages
+[ ] Test: scroll to top repeatedly in a conversation with 100+
+    messages, confirm no duplicate messages appear and order stays
+    correct
+
+====================================================
+PHASE 6 — REFACTOR INTO HOOKS (do this LAST, once logic is stable)
+====================================================
+Do not refactor into separate hooks before the above logic is bug
+free — refactoring buggy logic just spreads the same bug across
+three files instead of one.
+
+[ ] Extract into hooks/useMessages.ts:
+      - fetch + pagination (Phase 5)
+      - dedupe + sort (3.4, 3.5)
+      - optimistic send + isSending (3.6)
+      - realtime message subscription (INSERT events)
+[ ] Extract into hooks/useMessageStatus.ts:
+      - batched read-status upsert (3.2, 3.3)
+      - status Map + O(1) lookup (3.9)
+      - realtime message_status UPDATE subscription (listen for
+        delivered/read changes and reflect them in message state)
+[ ] Extract into hooks/useTyping.ts:
+      - single persistent channel via ref (4.1)
+      - subscribe-then-broadcast (4.2)
+      - timeout debounce (4.3)
+[ ] ChatThread component should be left with ONLY rendering logic —
+    it calls these 3 hooks and renders their returned state
+[ ] On unmount (in each hook, or a combined cleanup): remove all
+    realtime channels via supabase.removeChannel(), clear all
+    timers/timeouts — verify with browser dev tools that no channel
+    is left open after navigating away from a conversation
+
+====================================================
+PHASE 7 — FINAL PRE-DEPLOY CHECKLIST
+====================================================
+
+[ ] No duplicate messages under rapid realtime + pagination overlap
+[ ] No duplicate message_status rows (upsert conflict targets correct)
+[ ] Delivered status created only by DB trigger, never by client
+[ ] Read status batched, not looped
+[ ] Typing channel created once, reused, cleaned up on unmount
+[ ] Sidebar shows real participant names
+[ ] Sidebar shows active-conversation indicator
+[ ] Sidebar collapses/toggles correctly on mobile, no horizontal
+    scroll anywhere
+[ ] New message auto-scrolls only when appropriate (not while
+    reading history)
+[ ] Lazy load works both directions without breaking scroll position
+    or causing duplicates
+[ ] RLS re-verified on all 5 tables with 2 separate test accounts
+[ ] All supabase calls have error handling with useful logs
+[ ] No eslint-disable-next-line hiding a real dependency bug
+[ ] All realtime channels + timers confirmed cleaned up on unmount
+    (check via browser dev tools / network tab after navigating away)
+[ ] Manual regression test repeated from Phase 0 baseline scenario —
+    confirm still works end to end
+
+====================================================
+FUTURE / POST-LAUNCH (not required for this deploy)
+====================================================
+- Message edit / delete UI (schema already supports it, Phase 2.1)
+- Reply-to threading (schema already supports it, Phase 2.1)
+- Online/offline presence (use Supabase Presence, not DB polling)
+- Last seen
+- Reactions, attachments, voice messages, images, videos, files
+- Pinned messages
+- Retry failed messages / offline message queue
+- Virtualized message list (only needed if lazy load performance
+  becomes insufficient at scale)

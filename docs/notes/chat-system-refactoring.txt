@@ -1,0 +1,299 @@
+Chat System Refactoring Instructions
+===================================
+
+Goal:
+Make the chat system production-ready by removing race conditions, reducing unnecessary network requests, improving realtime behavior, and making the UI more reliable.
+
+--------------------------------------------------
+1. Remove INSERT/UPSERT Race Condition
+--------------------------------------------------
+
+Current Problem:
+- The application inserts a "delivered" status when a message arrives.
+- The application later upserts a "read" status.
+- Both operations can happen simultaneously, causing duplicate key conflicts.
+
+Required Changes:
+- Never perform INSERT and UPSERT for the same row from different places.
+- Use only UPSERT for message status creation and updates.
+- Define one clear flow for status changes:
+    sent
+      ↓
+    delivered
+      ↓
+      read
+
+--------------------------------------------------
+2. Batch Status Updates
+--------------------------------------------------
+
+Current Problem:
+- One network request is sent for every unread message.
+
+Required Changes:
+- Collect all unread messages.
+- Send one UPSERT request containing an array of rows.
+- Never call Supabase inside a loop.
+
+Bad:
+forEach → upsert()
+
+Good:
+upsert([
+    ...
+])
+
+--------------------------------------------------
+3. Prevent Continuous Read Updates
+--------------------------------------------------
+
+Current Problem:
+- Every messages state update triggers another read-status update.
+
+Required Changes:
+- Only mark messages as read when:
+    - Chat is opened
+    - New unread message arrives
+- Do not rerun read updates for every render.
+
+--------------------------------------------------
+4. Fix Typing Channel
+--------------------------------------------------
+
+Current Problem:
+- A new realtime channel is created on every key press.
+
+Required Changes:
+- Create the typing channel only once.
+- Store it using useRef.
+- Reuse the same channel for all typing events.
+- Never create realtime channels inside handleInputChange().
+
+--------------------------------------------------
+5. Subscribe Before Sending Broadcast
+--------------------------------------------------
+
+Current Problem:
+- Broadcasts are sent without ensuring the channel is subscribed.
+
+Required Changes:
+- Subscribe once.
+- After subscription completes, send typing broadcasts.
+
+--------------------------------------------------
+6. Listen For Status Updates
+--------------------------------------------------
+
+Current Problem:
+- The sender never receives read/delivered updates.
+
+Required Changes:
+- Subscribe to UPDATE events on message_status.
+- Whenever a status changes:
+    Update the corresponding message in state.
+
+--------------------------------------------------
+7. Improve Status Lookup Performance
+--------------------------------------------------
+
+Current Problem:
+- data.find() is executed inside map().
+
+Complexity:
+O(n²)
+
+Required Changes:
+- Convert status array into a Map.
+- Lookup status using O(1).
+
+--------------------------------------------------
+8. Prevent Duplicate Messages
+--------------------------------------------------
+
+Current Problem:
+- Initial fetch and realtime insert may both add the same message.
+
+Required Changes:
+- Before adding a realtime message:
+    Check whether the message ID already exists.
+- Ignore duplicates.
+
+--------------------------------------------------
+9. Maintain Message Order
+--------------------------------------------------
+
+Current Problem:
+- Messages are appended blindly.
+
+Required Changes:
+- After inserting realtime messages:
+    Sort messages by created_at.
+
+--------------------------------------------------
+10. Add Optimistic UI
+--------------------------------------------------
+
+Current Problem:
+- User waits for database response before seeing the message.
+
+Required Changes:
+- Immediately display the outgoing message.
+- Replace temporary message after database confirmation.
+
+--------------------------------------------------
+11. Add Loading State While Sending
+--------------------------------------------------
+
+Current Problem:
+- Double-click can send duplicate messages.
+
+Required Changes:
+- Add isSending state.
+- Disable send button while request is in progress.
+
+--------------------------------------------------
+12. Improve useEffect Dependencies
+--------------------------------------------------
+
+Current Problem:
+- Some effects ignore required dependencies.
+
+Required Changes:
+- Remove unnecessary eslint-disable comments.
+- Add correct dependency arrays.
+- Prevent stale closures.
+
+--------------------------------------------------
+13. Add Proper Error Handling
+--------------------------------------------------
+
+Current Problem:
+- Errors are ignored.
+
+Required Changes:
+For every Supabase request:
+- Check error.
+- Log useful debugging information.
+- Show user-friendly feedback if necessary.
+
+--------------------------------------------------
+14. Clear Typing Timeouts
+--------------------------------------------------
+
+Current Problem:
+- Every typing event creates another timeout.
+
+Required Changes:
+- Store timeout ID in useRef.
+- Clear previous timeout before creating a new one.
+
+--------------------------------------------------
+15. Reduce Database Requests
+--------------------------------------------------
+
+Current Problem:
+- Multiple independent queries are executed unnecessarily.
+
+Required Changes:
+- Batch queries whenever possible.
+- Avoid repeated selects after every small update.
+
+--------------------------------------------------
+16. Separate Business Logic
+--------------------------------------------------
+
+Current Problem:
+- Chat component contains all realtime logic.
+
+Required Changes:
+Move logic into:
+- hooks/useMessages.ts
+- hooks/useTyping.ts
+- hooks/useMessageStatus.ts
+
+Keep ChatThread focused on rendering UI.
+
+--------------------------------------------------
+17. Add Pagination
+--------------------------------------------------
+
+Current Problem:
+- Entire conversation loads at once.
+
+Required Changes:
+- Load latest messages first.
+- Load older messages on scroll.
+- Avoid large IN queries.
+
+--------------------------------------------------
+18. Improve Realtime Cleanup
+--------------------------------------------------
+
+Required Changes:
+On component unmount:
+- Remove all realtime channels.
+- Clear all timers.
+- Prevent memory leaks.
+
+--------------------------------------------------
+19. Improve State Updates
+--------------------------------------------------
+
+Required Changes:
+Avoid unnecessary state updates.
+
+Only update:
+- Changed message
+- Changed status
+- Newly inserted message
+
+Do not recreate the entire messages array unless necessary.
+
+--------------------------------------------------
+20. Improve Database Design
+--------------------------------------------------
+
+Review the message_status table.
+
+Ensure:
+- Primary key is correct.
+- Composite primary key is intentional.
+- UPSERT uses the same conflict columns.
+- Proper indexes exist on:
+    message_id
+    user_id
+    conversation_id
+
+--------------------------------------------------
+21. Future Improvements
+--------------------------------------------------
+
+Consider implementing:
+- Message edit
+- Message delete
+- Online/offline presence
+- Last seen
+- Read receipts per participant
+- Retry failed messages
+- Offline message queue
+- Attachment support
+- Voice messages
+- Infinite scrolling
+- Virtualized message list
+
+--------------------------------------------------
+Final Goal
+--------------------------------------------------
+
+The finished chat system should provide:
+
+✓ No duplicate messages
+✓ No duplicate status rows
+✓ No race conditions
+✓ Efficient realtime updates
+✓ Minimal network requests
+✓ Optimistic UI
+✓ Stable typing indicator
+✓ Proper cleanup
+✓ Production-ready architecture
+✓ Scalable design
