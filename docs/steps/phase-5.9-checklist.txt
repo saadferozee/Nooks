@@ -19,11 +19,11 @@ matches 4.1-4.3 below, but you likely don't need to redo it.
 ====================================================
 0 - BEFORE YOU START
 ====================================================
-[ ] Create a new git branch: fix/production-readiness
+[x] Create a new git branch: fix/production-readiness
 [ ] Take a full backup / export of current Supabase schema and data
-[ ] Confirm RLS is currently working correctly on messages,
+[x] Confirm RLS is currently working correctly on messages,
     message_status, conversations, conversation_participants
-[ ] Write down current known-good test scenario:
+[x] Write down current known-good test scenario:
     - 2 users, 1 conversation, send a message, confirm it appears
     for both, before you change anything (this is your regression
     baseline)
@@ -59,7 +59,7 @@ Problem: the chat header doesn't show who you're talking to.
     available (already built for the sidebar in Phase 4 - reuse it)
 [ ] Show that participant's display_name / username in a header bar
     above the message list
-[ ] Handle group name display too (skip if group chat stays paused)
+[ ] Handle group name display too (skip for now, group chat stays paused)
 [ ] Test: opening a chat immediately shows who/what it is, no
     ambiguity
 

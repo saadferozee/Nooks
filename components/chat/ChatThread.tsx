@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/libraries/supabase/client";
 import { useAuthStore } from "@/libraries/stores/AuthStore";
 
@@ -18,6 +18,12 @@ export function ChatThread({ conversationId }: { conversationId: string }) {
     const [messages, setMessages] = useState<Message[]>([]);
     const [input, setInput] = useState("");
     const [typingUser, setTypingUser] = useState<string | null>(null);
+
+    // Holds the ONE subscribed typing channel for this conversation.
+    // Created once in the effect below, reused on every keystroke.
+    const typingChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(
+        null,
+    );
 
     useEffect(() => {
         supabase
@@ -57,6 +63,8 @@ export function ChatThread({ conversationId }: { conversationId: string }) {
     }, [messages.length]);
 
     useEffect(() => {
+        if (!user) return;
+
         const channel = supabase
             .channel(`conversation:${conversationId}`)
             .on(
@@ -86,8 +94,9 @@ export function ChatThread({ conversationId }: { conversationId: string }) {
         return () => {
             supabase.removeChannel(channel);
         };
+
         // eslint-disable-next-line
-    }, [conversationId]);
+    }, [conversationId, user?.id]);
 
     useEffect(() => {
         if (!user || messages.length === 0) return;
@@ -108,7 +117,8 @@ export function ChatThread({ conversationId }: { conversationId: string }) {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [messages, user]);
 
-    // ? this is for checking typing status.
+    // Typing indicator - ONE channel per conversation, created once,
+    // stored in the ref above. Nothing here touches message sending.
     useEffect(() => {
         const channel = supabase
             .channel(`typing:${conversationId}`)
@@ -120,16 +130,21 @@ export function ChatThread({ conversationId }: { conversationId: string }) {
             })
             .subscribe();
 
+        typingChannelRef.current = channel;
+
         return () => {
             supabase.removeChannel(channel);
+            typingChannelRef.current = null;
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [conversationId]);
 
     function handleInputChange(value: string) {
         setInput(value);
-        const channel = supabase.channel(`typing:${conversationId}`);
-        channel.send({
+        // Guard: only send if the channel exists AND is actually ready.
+        // If the user types before the subscribe() callback resolves,
+        // this just silently skips that one broadcast - harmless.
+        typingChannelRef.current?.send({
             type: "broadcast",
             event: "typing",
             payload: { userId: user?.id },
@@ -199,7 +214,9 @@ export function ChatThread({ conversationId }: { conversationId: string }) {
                                             ✓✓
                                         </span>
                                     ) : (
-                                        <span className="text-primary-light/70 dark:text-primary-dark">✓</span>
+                                        <span className="text-primary-light/70 dark:text-primary-dark">
+                                            ✓
+                                        </span>
                                     )}
                                 </p>
                             </div>
