@@ -7,6 +7,7 @@ import { createClient } from "@/libraries/supabase/client";
 import { useAuthStore } from "@/libraries/stores/AuthStore";
 import { usePresenceStore } from "@/libraries/stores/presenceStore";
 import LogoutButton from "../auth/LogoutButton";
+import { useParams } from "next/navigation";
 
 type ConversationRow = {
     conversation_id: string;
@@ -23,6 +24,9 @@ export function ConversationList() {
     const supabase = createClient();
     const user = useAuthStore((s) => s.user);
     const [conversations, setConversations] = useState<ConversationRow[]>([]);
+
+    const params = useParams<{ conversationId: string }>();
+    const activeConversationId = params.conversationId;
 
     useEffect(() => {
         if (!user) return;
@@ -116,7 +120,11 @@ export function ConversationList() {
                             <Link
                                 key={c.conversation_id}
                                 href={`/chat/${c.conversation_id}`}
-                                className="flex items-center gap-2 rounded-neo bg-surface-light/60 px-4 py-3 text-ink-light dark:bg-surface-dark/70 dark:text-ink-dark"
+                                className={`flex items-center gap-2 rounded-neo px-4 py-3 text-ink-light dark:text-ink-dark ${
+                                    c.conversation_id === activeConversationId
+                                        ? "border-2 border-primary-light bg-surface-light dark:border-primary-dark dark:bg-surface-dark"
+                                        : "border-2 border-transparent bg-surface-light/60 dark:bg-surface-dark/70"
+                                }`}
                             >
                                 {c.conversations.type === "direct" && (
                                     <span
