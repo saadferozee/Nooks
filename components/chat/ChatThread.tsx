@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/libraries/supabase/client";
 import { useAuthStore } from "@/libraries/stores/AuthStore";
+import useConversationParticipants from "@/libraries/hooks/useConversationParticipants";
 
 type Message = {
     id: string;
@@ -15,6 +16,8 @@ type Message = {
 export function ChatThread({ conversationId }: { conversationId: string }) {
     const supabase = createClient();
     const user = useAuthStore((s) => s.user);
+    const conversationInfo = useConversationParticipants(conversationId);
+
     const [messages, setMessages] = useState<Message[]>([]);
     const [input, setInput] = useState("");
     const [typingUser, setTypingUser] = useState<string | null>(null);
@@ -165,7 +168,34 @@ export function ChatThread({ conversationId }: { conversationId: string }) {
     }
 
     return (
-        <div className="flex h-screen flex-col p-4">
+        <div className="flex h-screen flex-col p-5 pl-0">
+            <div className="mb-5 p-3 rounded-neo shadow-neo-raised dark:shadow-neo-raised-dark flex items-baseline gap-4">
+                <h2 className="pl-4 font-bold text-lg text-ink-light dark:text-ink-dark">
+                    {conversationInfo?.conversationType === "group"
+                        ? conversationInfo.name
+                        : (conversationInfo?.otherUser?.display_name ??
+                          conversationInfo?.otherUser?.username ??
+                          "Loading...")}
+                </h2>
+                {conversationInfo?.conversationType !== "group" && (
+                    <h5 className="text-xs text-ink-light/50 dark:text-ink-dark/50">
+                        {conversationInfo?.otherUser?.last_seen
+                            ? `Last seen : ${new Date(
+                                  conversationInfo.otherUser.last_seen,
+                              ).toLocaleDateString("en-US", {
+                                  day: "numeric",
+                                  month: "short",
+                              })}, ${new Date(
+                                  conversationInfo.otherUser.last_seen,
+                              ).toLocaleTimeString("en-US", {
+                                  hour: "numeric",
+                                  minute: "2-digit",
+                                  hour12: true,
+                              })}`
+                            : "Loading..."}
+                    </h5>
+                )}
+            </div>
             <div className="flex-1 space-y-2 overflow-y-auto">
                 {messages.map((m) => (
                     <div
@@ -193,7 +223,7 @@ export function ChatThread({ conversationId }: { conversationId: string }) {
                                     ).toLocaleDateString("en-US", {
                                         day: "numeric",
                                         month: "short",
-                                    })}, 
+                                    })},
                                     ${new Date(m.created_at).toLocaleTimeString(
                                         "en-US",
                                         {
@@ -228,7 +258,7 @@ export function ChatThread({ conversationId }: { conversationId: string }) {
                                     ).toLocaleDateString("en-US", {
                                         day: "numeric",
                                         month: "short",
-                                    })}, 
+                                    })},
                                     ${new Date(m.created_at).toLocaleTimeString(
                                         "en-US",
                                         {

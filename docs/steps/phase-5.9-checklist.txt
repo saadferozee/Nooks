@@ -68,12 +68,12 @@ Problem: the chat header doesn't show who you're talking to.
 Problem: user can't tell which conversation is currently open in the
 sidebar.
 
-[ ] Derive "is this row active" by comparing the row's conversation_id
+[x] Derive "is this row active" by comparing the row's conversation_id
     to the current route param (useParams() in the sidebar, or pass
     it down)
-[ ] Apply a clearly distinct style when active (left accent bar,
+[x] Apply a clearly distinct style when active (left accent bar,
     stronger background - not just a subtle color shift)
-[ ] Test: click between conversations, only one row highlighted at
+[x] Test: click between conversations, only one row highlighted at
     a time, updates correctly
 
 1.4 Sidebar can't toggle on mobile / causes horizontal scroll

@@ -1,6 +1,5 @@
 import { ChatThread } from "@/components/chat/ChatThread";
 
-
 export default async function ChatPage({
     params,
 }: {
