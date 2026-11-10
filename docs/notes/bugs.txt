@@ -3,7 +3,7 @@ Finding Bugs
 
 
 -----------------
-[ ] No Scrolling after sending message. 
+[ ] No Scrolling after sending message.
 
 details: when user send a message, it appears in bottom of screen but it can't be seen because screen stuck at same stage, when user manually scroll, then he can see.
 
@@ -15,7 +15,7 @@ details: in sidebar, user can't see users name, its a static name "Direct Messag
 
 
 -----------------
-[ ] User can't see which message he in
+[ ] User can't see which message he in 
 
 details: user have to see a border in sidebar in other users name, and it shows its selected
 
